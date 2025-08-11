@@ -1,0 +1,45 @@
+
+
+	1.	Unassigned von set → vector + Flag + swap‑remove.
+	2.	Watch‑Listen korrekt und eng implementieren.
+	3.	JW‑Two Scores persistent + Heap; optional lazy refresh.
+	4.	Phase‑Saving für Polarity.
+	5.	const&, reserve(), noexcept, kleine inline‑Funktionen.
+	6.	Deterministischer RNG‑Seed + Sanitizer beim Debuggen.
+	7.	Parser robust (DIMACS), frühzeitige Fehler.
+
+
+
+
+TODO – Solver Verbesserungen
+
+1. CLI-Parameter einbauen:
+   - Pfad zur CNF-Datei als Argument
+   - Option für Zufalls-Seed
+   - Flags für Statistik-Ausgabe
+
+2. DIMACS-konforme Ausgabe:
+   - SAT: "s SATISFIABLE" + "v ±x … 0"
+   - UNSAT: "s UNSATISFIABLE"
+   - Exit-Codes: 10 (SAT), 20 (UNSAT)
+
+3. Statistiken erfassen:
+   - Anzahl Entscheidungen
+   - Anzahl Konflikte
+   - Anzahl propagierter Literale
+   - Anzahl gelernter Klauseln
+
+4. Performance-Optimierung:
+   - Watched Literals implementieren
+   - Learned-Clause-Datenstruktur verbessern
+   - Restart-Strategie einbauen#
+   - Phase Saving einschalten
+
+5. Codequalität:
+   - Kopien durch const-Referenzen ersetzen
+   - Random-Seed steuerbar machen
+   - Parser-Fehlerbehandlung verbessern
+
+6. Optional:
+   - Preprocessing-Hook für Unit Propagation vor Start
+   - Logging für Debug und Benchmark-Modus trennen

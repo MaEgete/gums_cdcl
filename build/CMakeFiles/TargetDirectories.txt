@@ -1,0 +1,3 @@
+/Users/martinegetemeyer/Entwicklung/masterarbeit/cdcl-solver/build/CMakeFiles/cdcl_solver.dir
+/Users/martinegetemeyer/Entwicklung/masterarbeit/cdcl-solver/build/CMakeFiles/edit_cache.dir
+/Users/martinegetemeyer/Entwicklung/masterarbeit/cdcl-solver/build/CMakeFiles/rebuild_cache.dir
