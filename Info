@@ -11,7 +11,7 @@
 
 
 
-TODO – Solver Verbesserungen
+Solver Verbesserungen
 
 1. CLI-Parameter einbauen:
    - Pfad zur CNF-Datei als Argument
