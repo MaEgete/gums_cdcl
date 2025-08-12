@@ -1,0 +1,8 @@
+Solver                        Trail
+  │ backtrackToLevel(L)        │
+  │───────────────────────────▶│ popped = popAboveLevel(L)
+  │                            │ (löscht Trail-Entries > L)
+  │◀───────────────────────────│
+  │ for v in popped: assignment[v] = -1
+  │ decisionLevel = L
+  │ qhead = min(qhead, trail.size())

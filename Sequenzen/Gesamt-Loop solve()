@@ -1,0 +1,27 @@
+main            CNFParser        Solver                    Heuristic           Trail
+ │                 │               │                           │                │
+ │ readFile()      │               │                           │                │
+ │──────────────▶  │               │                           │                │
+ │  clauses,numVars│               │                           │                │
+ │◀─────────────── │               │                           │                │
+ │                 │ push clauses  │                           │                │
+ │────────────────────────────────▶ addClause(c) (für alle)   │                │
+ │                 │               │ attachExistingClauses()   │                │
+ │                 │               │ seedRootUnits()           │ assign(L0 units)
+ │                 │               │ initializeJW(clauses,n) ─▶│ jwScores init  │
+ │                 │               │                           │                │
+ │                 │               │ while true:               │                │
+ │                 │               │   conflict = propagate()  │                │
+ │                 │               │   ┌──── if conflict ─────┐│                │
+ │                 │               │   │ analyzeConflict()     │                │
+ │                 │               │   │ backtrackToLevel()    │ popAboveLevel  │
+ │                 │               │   │ addClause(learned)    │ updateJW       │
+ │                 │               │   │ assign(assertLit, bj) │ assign(...)    │
+ │                 │               │   └───────────────────────┘│               │
+ │                 │               │   else if allAssigned → SAT                │
+ │                 │               │   else:                                     │
+ │                 │               │      var = pickBranchingVariable() ───────▶│
+ │                 │               │                             pick var        │
+ │                 │               │      assign(Literal{var,phase}, ++lvl) ◀───┘
+ │                 │               │
+ │◀──────────────────────────────────────────────────────────────────────────────│
