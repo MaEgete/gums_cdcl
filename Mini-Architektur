@@ -1,0 +1,7 @@
+[CNFParser] ──produziert──> [vector<Clause>] ──► [Solver]
+                                         │           │
+                                         ▼           ▼
+                                      [Clause]    [Heuristic]
+                                         │           │
+                                         ▼           ▼
+                                      [Literal]    [Trail] ──► (Assignments, Levels, Reasons)

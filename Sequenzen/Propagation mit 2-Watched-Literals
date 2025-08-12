@@ -1,0 +1,19 @@
+Solver                 Trail                  watchList                    Clause
+  │                     │                        │                           │
+  │ propagate()         │                        │                           │
+  │────────────────────▶│  tr = getTrail()       │                           │
+  │ while (qhead<tr):   │  p = tr[qhead].lit     │                           │
+  │   qhead++           │                        │                           │
+  │   propagateFalse(¬p)│───────────────────────▶│ wl = watchList[idx(¬p)]   │
+  │                     │                        │ for each clauseIdx in wl: │
+  │                     │                        │──────────────────────────▶ │ C=clauses[clauseIdx]
+  │                     │                        │                           │ w0,w1 = C.watch0/1
+  │                     │                        │                           │ if other watch literal true → continue
+  │                     │                        │                           │ else: try move watch
+  │                     │                        │                           │   find cand ∉ {w0,w1} not-false
+  │                     │                        │  wl[i] = wl.back(); pop   │   setWatch(wIdx→k); attach(clauseIdx,cand)
+  │                     │                        │                           │   continue
+  │                     │                        │                           │ if no move:
+  │                     │                        │                           │   if other FALSE → return conflict C
+  │                     │                        │                           │   else (other unassigned) → assign(other)
+  │ ◀───────────────────────────────────────────────────────────────────────────│

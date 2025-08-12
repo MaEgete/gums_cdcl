@@ -4,6 +4,7 @@
 
 Solver::Solver(int n) : numVars(n), assignment(numVars + 1, -1) {
     heuristic.initialize(numVars);
+    //currentHeuristic = HeuristicType::RANDOM;
     currentHeuristic = HeuristicType::JEROSLOW_WANG;
     watchList.assign(2 * numVars, {}); // 2 Einträge je Variable (pos/neg)
 }

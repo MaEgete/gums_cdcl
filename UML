@@ -1,0 +1,92 @@
++───────────────────────────────────────────────────────────────────────────+
+|                                  Solver                                   |
++───────────────────────────────────────────────────────────────────────────+
+| - numVars: int                                                            |
+| - clauses: vector<Clause>                                                 |
+| - watchList: vector<vector<size_t>>   // Index je Literal: (v-1)*2 + sign |
+| - assignment: vector<int>              // -1 unassigned, 0 false, 1 true  |
+| - trail: Trail                                                             |
+| - decisionLevel: int                                                       |
+| - qhead: size_t                       // Propagations-Kopf im Trail        |
+| - heuristic: Heuristic                                                     |
+| - currentHeuristic: HeuristicType (RANDOM | JEROSLOW_WANG)                 |
++───────────────────────────────────────────────────────────────────────────+
+| + Solver(n:int)                                                            |
+| + solve(): bool                                                            |
+| + addClause(c:Clause): void                                                |
+| + pickBranchingVariable(): Literal                                         |
+| + propagate(): Clause*                                                     |
+| + propagateLiteralFalse(falsified:Literal): Clause*                        |
+| + analyzeConflict(conflict:Clause*): tuple<Clause,int,Literal>             |
+| + backtrackToLevel(L:int): void                                            |
+| + assign(lit:Literal, level:int, reason_idx:int): void                     |
+| + allVariablesAssigned(): bool                                             |
+| + printModel(): void                                                       |
+| + attachExistingClauses(): void                                            |
+| + seedRootUnits(): void                                                    |
+| # litToIndex(l:Literal): int                                               |
+| # negate(l:Literal): Literal                                               |
+| # attachClause(clauseIdx,size_t,w:Literal): void                           |
+| # detachClause(clauseIdx,size_t,w:Literal): void                           |
++───────────────────────────────────────────────────────────────────────────+
+             | 1
+             | contains
+             v
++───────────────────────────+
+|           Trail           |
++───────────────────────────+
+| - trail: vector<TrailEntry>                                               |
+|   · TrailEntry { lit:Literal, level:int, reason_idx:int }                 |
++───────────────────────────+
+| + assign(lit,level,reason_idx): void                                      |
+| + isAssigned(var:int): bool                                               |
+| + currentLevel(): int                                                     |
+| + getLevelOfVar(var:int): int                                             |
+| + getReasonIndexOfVar(var:int): int                                       |
+| + popAboveLevel(level:int): vector<int>                                   |
+| + getTrail(): const vector<TrailEntry>&                                   |
++───────────────────────────+
+
++───────────────────────────+                +──────────────────────────────+
+|          Clause           |  *  contains   |            Literal            |
++───────────────────────────+───────────────▶+──────────────────────────────+
+| - clause: vector<Literal> |                | - var:int                     |
+| - w0: int                 |                | - negated:bool                |
+| - w1: int                 |                +──────────────────────────────+
++───────────────────────────+                | + getVar(): int               |
+| + initWatchesDefault():void               | + isNegated(): bool           |
+| + watch0(): int                           | + toInt(): int                |
+| + watch1(): int                           | + operator==(other): bool     |
+| + setWatch0(i:int): void                  +──────────────────────────────+
+| + setWatch1(i:int): void
+| + otherWatchIndex(i:int): int  // (i==w0 ? w1 : w0)
+| + size(): size_t
+| + at(k:size_t): const Literal&
+| + getClause(): const vector<Literal>&
++───────────────────────────+
+
++───────────────────────────+
+|          Heuristic        |
++───────────────────────────+
+| - jwScores: vector<double>     // pro Variable                           |
+| - unassignedVars: set<int>                                             |
++───────────────────────────+
+| + initialize(numVars:int): void                                         |
+| + update(trail:Trail,numVars:int): void                                 |
+| + pickRandomVar(): int                                                  |
+| + pickJeroslowWangVar(assignment:vector<int>): int                      |
+| + initializeJeroslowWang(clauses:vector<Clause>, numVars:int): void     |
+| + updateJeroslowWang(newClause:Clause): void                            |
++───────────────────────────+
+
++───────────────────────────+
+|          CNFParser        |
++───────────────────────────+
+| - path: filesystem::path                                            |
+| - clauses: vector<Clause>                                           |
+| - numVariables: int                                                 |
++───────────────────────────+
+| + readFile(): bool                                                  |
+| + getClauses(): vector<Clause>&                                     |
+| + getNumVariables(): int                                            |
++───────────────────────────+
