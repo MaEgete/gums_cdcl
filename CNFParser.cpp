@@ -6,6 +6,7 @@
 #include <sstream>
 #include <set>
 #include <algorithm>
+#include <limits>
 
 CNFParser::CNFParser(const std::string_view path) : path{path} {}
 
@@ -24,43 +25,65 @@ bool CNFParser::readFile() {
     int numVars     = 0; // Anzahl an Variablen aus der Datei
     int numClauses  = 0; // Anzahl an Klauseln aus der Datei
 
-    std::string line;
-    while (std::getline(ifs, line)) {
-        line.erase(0, line.find_first_not_of(" \t\r\n"));
-        if (line.empty() || line[0] == 'c') continue;
+    std::string tok;
+    std::vector<Literal> current; // sammelt Literale bis zur 0 (Klauselabschluss)
 
-        if (line[0] == 'p') {
-            std::istringstream iss(line);
-            std::string tmp;
-            iss >> tmp >> tmp >> numVars >> numClauses;
-        } else {
-            std::istringstream iss(line);
-            int lit;
-            std::vector<Literal> clauseLits; // Literal-Vector erstellen
-            while (iss >> lit && lit != 0) {
-                int lit_abs = std::abs(lit); // Variable aus dem Literal extrahieren
-                clauseLits.emplace_back(lit_abs, lit < 0); // Eintrag in Literal-Vector erstellen
-                varsCount.insert(lit_abs); // Anzahl an Variablen überprüfen
-            }
-            if (!clauseLits.empty()) { // Sicherheitsabfrage
-                Clause clause(clauseLits); // Aus Literal-Vector die Klausel erstellen
-                clauseCount++; // Anzahl an Klauseln überprüfen
-                this->clauses.push_back(clause);
-            }
+    while (ifs >> tok) {
+        if (!tok.empty() && tok[0] == 'c') {
+            // Kommentar: Rest der Zeile überspringen
+            ifs.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+            continue;
         }
+        if (!tok.empty() && tok[0] == 'p') {
+            // Header: "p cnf <numVars> <numClauses>"
+            std::string cnf;
+            ifs >> cnf >> numVars >> numClauses;
+            // Rest der Zeile ignorieren (robust ggü. trailing content)
+            ifs.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+            continue;
+        }
+
+        // Ab hier erwarten wir Integer-Tokens (Literal oder 0)
+        int lit = std::stoi(tok);
+        if (lit == 0) {
+            if (!current.empty()) {
+                Clause clause(std::move(current));
+                clause.initWatchesDefault();
+                this->clauses.push_back(std::move(clause));
+                ++clauseCount;
+                current.clear();
+            }
+            continue;
+        }
+
+        int v = std::abs(lit);
+        bool neg = (lit < 0);
+        current.emplace_back(v, neg);
+        varsCount.insert(v);
     }
 
-    // Die Maximale Variable heraus extrahieren aus der Set
-    numVariables = varsCount.empty() ? 0 : *std::ranges::max_element(varsCount);
+    // Dateiende: Falls eine Klausel nicht mit 0 abgeschlossen wurde, ignorieren wir den Rest (optional Warnung)
+    if (!current.empty()) {
+        std::cerr << "Warnung: Letzte Klausel endete nicht mit 0 und wurde ignoriert.\n";
+        current.clear();
+    }
+
+    // Maximale tatsächlich verwendete Variable bestimmen
+    int maxVarSeen = varsCount.empty() ? 0 : *std::ranges::max_element(varsCount);
 
     // Sicherheitsabfrage - Abgleich von Werten
-    if (varsCount.empty() || numVariables != numVars) {
+    // DIMACS erlaubt, dass der Header mehr Variablen deklariert als tatsächlich verwendet.
+    // Fehler ist nur, wenn maxVarSeen > numVars oder gar keine Variable gelesen wurde.
+    if (varsCount.empty() || maxVarSeen > numVars) {
         std::cerr << "Variablen stimmen nicht überein!\n"
-                     "Maximale angegebene Variable: " << numVariables
-                  << ", Tatsächliche maximale Variable: " << numVars << std::endl;
+                     "Max gefundene Variable: " << maxVarSeen
+                  << ", Header (deklarierte Variablen): " << numVars << std::endl;
         this->clauses.clear();
         return false;
     }
+
+    // Für nachgelagerte Strukturen ist der Header-Wert maßgeblich
+    this->numVariables = numVars;
 
     // Sicherheitsabfrage - Abgleich von Werten
     if (clauseCount != numClauses) {

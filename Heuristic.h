@@ -17,14 +17,13 @@ private:
 
 public:
     void initialize(int numVars);
-    int pickRandomVar();
+    int  pickRandomVar();
     void update(const Trail& trail, int numVars);
 
-
-    int pickJeroslowWangVar(const std::vector<int>& assignment);
-    // Neue Methode: Initialisiert die Scores für Jeroslow-Wang
+    int  pickJeroslowWangVar(const std::vector<int>& assignment);
+    // Initialisiert die Scores für Jeroslow-Wang
     void initializeJeroslowWang(const std::vector<Clause>& clauses, int numVars);
-    // Neue Methode: Aktualisiert die Scores für eine einzelne neue Klausel
+    // Aktualisiert die Scores für eine einzelne neue Klausel
     void updateJeroslowWang(const Clause& newClause);
 };
 

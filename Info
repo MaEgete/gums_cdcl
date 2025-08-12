@@ -1,12 +1,15 @@
 
 
-	1.	Unassigned von set → vector + Flag + swap‑remove.
-	2.	Watch‑Listen korrekt und eng implementieren.
-	3.	JW‑Two Scores persistent + Heap; optional lazy refresh.
-	4.	Phase‑Saving für Polarity.
-	5.	const&, reserve(), noexcept, kleine inline‑Funktionen.
-	6.	Deterministischer RNG‑Seed + Sanitizer beim Debuggen.
-	7.	Parser robust (DIMACS), frühzeitige Fehler.
+2WL-Änderungen:
+
+Fertig:
+- Clause
+- CNFParser
+
+
+Unfertig:
+- Solver
+- Trail
 
 
 

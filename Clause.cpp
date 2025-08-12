@@ -2,6 +2,15 @@
 
 Clause::Clause(std::vector<Literal> cla) : clause{std::move(cla)} {}
 
+
+void Clause::initWatchesDefault() {
+    if (clause.empty()) { w0 = w1 = -1; return; }
+    if (clause.size() == 1) { w0 = 0; w1 = 0; return; }
+    w0 = 0;
+    w1 = 1;
+}
+
+
 const std::vector<Literal>& Clause::getClause() const {
     return this->clause;
 }

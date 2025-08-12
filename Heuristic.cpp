@@ -1,8 +1,6 @@
 #include "Heuristic.h"
-#include <iostream>
 #include <iterator>
 #include <cmath>
-#include <map>
 #include <stdexcept>
 
 // Ursprüngliche Zufalls-Heuristik
@@ -20,21 +18,25 @@ int Heuristic::pickRandomVar() {
 
 // Jeroslow-Wang-Heuristik (jetzt basierend auf den internen Scores)
 int Heuristic::pickJeroslowWangVar(const std::vector<int>& assignment) {
-    int bestVar = -1;
-    double maxScore = -1.0;
-    int numVars = static_cast<int>(assignment.size() - 1);
+    int bestVar  = -1;
+    double best  = -1.0;
+    int numVars  = static_cast<int>(assignment.size() - 1);
 
-    for (int i = 1; i <= numVars; ++i) {
-        if (assignment[i] == -1) { // Nur unzugewiesene Variablen prüfen
-            if (jwScores[i] > maxScore) {
-                maxScore = jwScores[i];
-                bestVar = i;
+    for (int v = 1; v <= numVars; ++v) {
+        if (assignment[v] == -1) { // Nur unzugewiesene Variablen
+            if (jwScores[v] > best) {
+                best    = jwScores[v];
+                bestVar = v;
             }
         }
     }
 
     if (bestVar == -1) {
-        return pickRandomVar();
+        // Sicherer Fallback: erste unbelegte Variable (statt pickRandomVar, um leeres Set zu vermeiden)
+        for (int v = 1; v <= numVars; ++v) {
+            if (assignment[v] == -1) return v;
+        }
+        return -1; // alles belegt
     }
 
     return bestVar;
