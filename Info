@@ -1,18 +1,21 @@
 
 
-2WL-Änderungen:
+- CLI-Parameter einbauen
 
-Fertig:
-- Clause
-- CNFParser
+- Weitere Heuristiken (Paper) anschauen:
 
+- Powerpoint:
+    - VSIDS: https://swtv.kaist.ac.kr/courses/cs453-fall09/model_checkin_2.pdf
 
-Unfertig:
-- Solver
-- Trail
+- Interessante Paper:
+    - The Impact of Branching Heuristics in Propositional Satisfiability Algorithms:
+        - https://mathweb.ucsd.edu/~sbuss/CourseWeb/Math268_2007WS/MarquesSilva_Branching_1999.pdf
+    - NEURAL HEURISTICS FOR SAT SOLVING
+        - https://rlgm.github.io/papers/32.pdf
+    - Learning Local Search Heuristics for Boolean Satisfiability
+        - https://www.cs.cmu.edu/~eyolcu/research/learning-local-search-heuristics-sat.pdf
 
-
-
+    - Schauen, obs die Paper auch auf Arxiv.org gibt (wirklt vllt. seriöser)
 
 Solver Verbesserungen
 

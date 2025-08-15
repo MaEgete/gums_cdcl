@@ -51,7 +51,7 @@ bool CNFParser::readFile() {
                 clause.initWatchesDefault();
                 this->clauses.push_back(std::move(clause));
                 ++clauseCount;
-                current.clear();
+                current.clear(); // current-Vector leeren
             }
             continue;
         }
@@ -72,8 +72,8 @@ bool CNFParser::readFile() {
     int maxVarSeen = varsCount.empty() ? 0 : *std::ranges::max_element(varsCount);
 
     // Sicherheitsabfrage - Abgleich von Werten
-    // DIMACS erlaubt, dass der Header mehr Variablen deklariert als tatsächlich verwendet.
-    // Fehler ist nur, wenn maxVarSeen > numVars oder gar keine Variable gelesen wurde.
+    // DIMACS erlaubt, dass der Header mehr Variablen deklariert als tatsächlich verwendet
+    // Fehler ist nur, wenn maxVarSeen > numVars oder gar keine Variable gelesen wurde
     if (varsCount.empty() || maxVarSeen > numVars) {
         std::cerr << "Variablen stimmen nicht überein!\n"
                      "Max gefundene Variable: " << maxVarSeen

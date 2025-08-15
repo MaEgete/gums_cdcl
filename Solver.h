@@ -6,13 +6,25 @@
 #include "Trail.h"
 #include "Heuristic.h"
 
+struct Stats {
+    uint64_t decisions=0, conflicts=0, propagations=0;
+    uint64_t learnts_added=0;
+    uint64_t clause_inspections=0, watch_moves=0;
+    uint64_t t_bcp_ms=0, t_analyze_ms=0;
+};
+
 enum class HeuristicType {
     RANDOM,
     JEROSLOW_WANG
 };
 
+
+
 class Solver {
 private:
+
+    Stats stats;
+
     int numVars;
     // Für jedes Literal (inkl. Negation) eine Liste beobachtender Klauseln (Indices)
     std::vector<std::vector<size_t>> watchList;
@@ -33,6 +45,7 @@ private:
 
     // assignment[i] = -1 (unbelegt), 0 (false), 1 (true), Index 0 ignorieren
     std::vector<int> assignment;
+    std::vector<int> savedPhase; // -1 = unknown, 0 = prefer false (negated), 1 = prefer true (non-negated)
 
 public:
     explicit Solver(int n);
@@ -51,6 +64,7 @@ public:
     bool allVariablesAssigned() const;
     void addClause(const Clause& clause);
     void printModel() const;
+    void printStats() const;
 
     Clause* propagate();             // neue Propagation mit 2WL
     void    attachExistingClauses(); // falls Clauses schon im Vektor sind

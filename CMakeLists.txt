@@ -16,4 +16,5 @@ add_executable(cdcl_solver main.cpp
         Heuristic.h
         Literal.cpp
         Literal.h
+        Timer.h
 )

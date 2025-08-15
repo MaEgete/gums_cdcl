@@ -27,7 +27,7 @@ int Trail::getReasonIndexOfVar(int var) const {
     for (auto it = trail.rbegin(); it != trail.rend(); ++it) {
         if (it->lit.getVar() == var) return it->reason_idx;
     }
-    return -1;
+    return -1; // Variable noch nicht zugewiesen
 }
 
 std::vector<int> Trail::popAboveLevel(int level) {

@@ -21,7 +21,7 @@ public:
     void update(const Trail& trail, int numVars);
 
     int  pickJeroslowWangVar(const std::vector<int>& assignment);
-    // Initialisiert die Scores für Jeroslow-Wang
+    // Initialisiert die Scores für Jeroslow-Wang (JW-TS)
     void initializeJeroslowWang(const std::vector<Clause>& clauses, int numVars);
     // Aktualisiert die Scores für eine einzelne neue Klausel
     void updateJeroslowWang(const Clause& newClause);

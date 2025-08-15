@@ -1,11 +1,13 @@
 #include "Solver.h"
+#include "Timer.h"
+
 #include <algorithm>
 #include <iostream>
 
-Solver::Solver(int n) : numVars(n), assignment(numVars + 1, -1) {
+Solver::Solver(int n) : numVars(n), assignment(numVars + 1, -1), savedPhase(numVars + 1, -1) {
     heuristic.initialize(numVars);
     //currentHeuristic = HeuristicType::RANDOM;
-    currentHeuristic = HeuristicType::JEROSLOW_WANG;
+    currentHeuristic = HeuristicType::JEROSLOW_WANG; // JW-TS
     watchList.assign(2 * numVars, {}); // 2 Einträge je Variable (pos/neg)
 }
 
@@ -29,6 +31,7 @@ bool Solver::solve() {
             backtrackToLevel(backjumpLevel);
 
             addClause(learnedClause);
+            stats.learnts_added++;
             int reason_idx = static_cast<int>(clauses.size()) - 1;
 
             assign(assertLit, backjumpLevel, reason_idx);
@@ -110,11 +113,19 @@ Clause* Solver::unitPropagation() {
 }
 
 void Solver::assign(const Literal& lit, int level, int reason_idx) {
+    // Stats: decision vs propagation
+    if (reason_idx == -1) {
+        stats.decisions++;
+    } else {
+        stats.propagations++;
+    }
     trail.assign(lit, level, reason_idx); // an Trail anhängen (enqueue)
     assignment[lit.getVar()] = lit.isNegated() ? 0 : 1;
+    savedPhase[lit.getVar()] = lit.isNegated() ? 0 : 1;
 }
 
 std::tuple<Clause,int,Literal> Solver::analyzeConflict(const Clause* conflict) {
+    ScopedTimer _t(stats.t_analyze_ms);
     Clause learnedClause = *conflict;
     const int currentLevel = decisionLevel;
 
@@ -232,7 +243,15 @@ Literal Solver::pickBranchingVariable() {
         if (var <= 0) var = 1; // sollte durch allVariablesAssigned() nie relevant sein
     }
 
-    return Literal{var, false};
+    // Phase saving
+    bool useNegated;
+    if (savedPhase[var] == -1) {
+        useNegated = false;
+    } else {
+        useNegated = (savedPhase[var] == 0);
+    }
+
+    return Literal{var, useNegated};
 }
 
 void Solver::setHeuristic(HeuristicType type) {
@@ -267,9 +286,24 @@ void Solver::addClause(const Clause& clause) {
 
 void Solver::printModel() const {
     for (int i = 1; i <= numVars; ++i) {
-        std::cout << "x" << i << " = " << (assignment[i] == 1 ? "True" : "False") << "\n";
+        std::cout << "x" << i << " = "
+        << (assignment[i] == -1 ? "Unassigned"
+            : (assignment[i] == 1 ? "True" : "False")) << "\n";
     }
 }
+
+void Solver::printStats() const {
+    std::cout << "Stats:\n"
+      << "decisions=" << stats.decisions
+      << " conflicts=" << stats.conflicts
+      << " propagations=" << stats.propagations
+      << " learnts_added=" << stats.learnts_added
+      << " inspections=" << stats.clause_inspections
+      << " watch_moves=" << stats.watch_moves
+      << " t_bcp_ms=" << stats.t_bcp_ms
+      << "\n";
+}
+
 
 Clause* Solver::propagateLiteralFalse(const Literal &falsified) {
     // Nur Klauseln betrachten, die das aktuell falsifizierte Literal beobachten
@@ -278,6 +312,7 @@ Clause* Solver::propagateLiteralFalse(const Literal &falsified) {
     while (i < wl.size()) {
         size_t cidx = wl[i];
         Clause* C = &clauses[cidx];
+        stats.clause_inspections++;
 
         const int w0 = C->watch0();
         const int w1 = C->watch1();
@@ -317,6 +352,7 @@ Clause* Solver::propagateLiteralFalse(const Literal &falsified) {
                 wl.pop_back();
                 attachClause(cidx, cand); // in die neue Watchliste einhängen
                 if (wIdx == 0) C->setWatch0((int)k); else C->setWatch1((int)k);
+                stats.watch_moves++;
                 moved = true;
                 break;
             }
@@ -344,6 +380,9 @@ Clause* Solver::propagateLiteralFalse(const Literal &falsified) {
 }
 
 Clause *Solver::propagate() {
+
+    ScopedTimer _t(stats.t_bcp_ms);
+
     // Verarbeite alle neuen Trail-Einträge ab qhead
     const auto& tr = trail.getTrail();
     while (qhead < tr.size()) {
@@ -352,7 +391,10 @@ Clause *Solver::propagate() {
 
         // p == true -> ¬p ist falsifiziert: nur diese Watch-Liste bearbeiten
         Clause* confl = propagateLiteralFalse(negate(p));
-        if (confl) return confl;
+        if (confl) {
+            stats.conflicts++;
+            return confl;
+        }
     }
     return nullptr;
 }

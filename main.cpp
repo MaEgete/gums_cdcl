@@ -11,7 +11,7 @@
 int main() {
     std::cout << "Ich bin der CDCL-SAT-Solver Gums" << std::endl;
 
-    std::string pfad = "../examples/stundenplan.cnf"; // ggf. anpassen
+    std::string pfad = "../examples/Sudoku1_ohne.cnf"; // ggf. anpassen
 
     CNFParser parser{pfad};
 
@@ -39,6 +39,7 @@ int main() {
         if (result) {
             solver.printModel();
             std::cout << "SATISFIABLE" << std::endl;
+            solver.printStats();
         } else {
             std::cout << "UNSATISFIABLE" << std::endl;
         }
