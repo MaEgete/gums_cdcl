@@ -1,0 +1,63 @@
+Grundbegriffe
+	•	Variable / Literal – Variable x_i; Literal ist x_i oder \neg x_i.
+	•	Klausel / CNF – Disjunktion von Literalen / Konjunktion von Klauseln.
+	•	Zuweisung (assignment) – -1 = unassigned, 0 = false, 1 = true.
+	•	Polarität – Vorzeichen eines Literals (positiv/negativ).
+	•	Decision Level (DL) – Tiefe im Suchbaum; Root-Level = 0.
+	•	Trail – Sequenz aller gesetzten Literale inkl. Level & Reason.
+	•	Reason – Klausel, die eine Propagation erzwungen hat; reason_idx=-1 ⇒ Entscheidung.
+
+Propagation & Konflikte
+	•	BCP (Unit Propagation) – Erzwinge Literale aus Unit-Klauseln.
+	•	Unit-Klausel – Klausel mit genau einem noch ungesetzten Literal.
+	•	Konflikt – Klausel wird falsch (alle Literale falsch).
+	•	2WL (Two-Watched Literals) – Pro Klausel zwei beobachtete Literale zur schnellen BCP.
+	•	Watch-Move – Umhängen eines Watches auf ein anderes Literal.
+	•	Clause Inspection – Eine beobachtete Klausel wurde im Zuge der BCP geprüft.
+
+Suche & Rücksprung
+	•	Entscheidung (decision) – Freies Setzen einer Variable (reason = -1).
+	•	Backtrack – Schritte im Trail zurückgehen.
+	•	Backjump (nicht-chronologisch) – Direkt auf ein tieferes Level springen (aus Analyse).
+	•	Restart – Suche auf DL=0 neu starten, gelerntes Wissen behalten.
+
+Konfliktanalyse & Lernen
+	•	Gelernte Klausel (learnt) – Klausel aus Resolvents des Konfliktgraphen.
+	•	UIP / 1-UIP – (First) Unique Implication Point; bevorzugter Schnitt für learnt.
+	•	LBD (Literal Block Distance) – Anzahl verschiedener Decision Levels in einer Klausel („Glue“); kleiner = besser/nützlicher.
+	•	Klausel-Minimierung – Entfernen entbehrlicher Literale aus der learnt.
+
+Heuristiken (Variablen-/Polarity-Wahl)
+	•	VSIDS – Variable State Independent Decaying Sum; Variablenaktivität mit Bump/Decay.
+	•	EVSIDS – VSIDS mit exponentiellem (lazy) Decay (MiniSat-Stil).
+	•	JW (Jeroslow-Wang)
+    	•	JW-one: Score pro Literal \sum_{C \ni \ell} 2^{-|C|}; wähle Literal.
+    	•	JW-two: Score pro Variable \(S(x)=S(x)\{pos}+S(x)\{neg}\); wähle Var, Polarität separat.
+	•	Phase Saving – Merke letzte erfolgreiche Polarität pro Variable und verwende sie wieder.
+	•	Agility – Wie oft ändern sich Werte (Hamming-Flips) über ein Fenster; Maß für „Unruhe“.
+
+Aktivitäten & Gewichte
+	•	Bump – Aktivitätswert/Score erhöhen (z. B. für Vars in learnt/Reason).
+	•	Decay – Aktivitätswerte abwerten, damit neue Ereignisse stärker zählen.
+            Lazy Decay: Skaliere nur das Inkrement (inc /= decay) statt alle Werte zu multiplizieren.
+	•	Rescale – Alle Aktivitäten proportional verkleinern, um Overflow zu vermeiden.
+	•	Clause Activity – Aktivität von Klauseln (für DB-Reduktion/Behalten).
+
+Klauseldatenbank (DB)
+	•	Original vs. Learnt – Eingangs- vs. gelernte Klauseln.
+	•	Reduktion – Periodisches Löschen schwacher learnts (z. B. nach Aktivität/LBD/Alter).
+	•	Usefulness – Klausel wurde als Reason benutzt oder trat in Konflikten auf.
+
+Leistungskennzahlen (Stats)
+	•	decisions / conflicts / propagations – Kernzähler der Suche.
+	•	learnts_added / restarts / clause_inspections / watch_moves – DB- & BCP-Kosten sichtbar.
+	•	t_bcp_ms / t_analyze_ms – Zeitbudget für BCP/Analyse.
+	•	PPD – propagations / decisions (hoher Wert oft gut).
+	•	CPS/PPS – conflicts/sec, propagations/sec.
+	•	ØLBD / ØLearnt-Größe / Backjump-Distanz – Qualität/„Klebrigkeit“ der Lernklauseln.
+
+Implementierungs-Patterns
+	•	RAII – Ressource im Konstruktor erwerben, im Destruktor freigeben (z. B. ScopedTimer).
+	•	ScopedTimer – RAII-Stoppuhr; addiert beim Scope-Ende verstrichene Zeit zu einem Zähler.
+	•	qhead – Index in den Trail: Grenze zwischen „propagiert“ und „noch zu propagieren“.
+	•	savedPhase – Vektor mit letzter Polarität je Var (bei dir: 0=negativ, 1=positiv, -1=unbekannt).

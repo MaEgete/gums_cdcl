@@ -224,30 +224,42 @@ void Solver::attachExistingClauses() {
 }
 
 Literal Solver::pickBranchingVariable() {
-    int var = -1;
+    int  var        = -1;
+    bool useNegated = false;
+
     switch (currentHeuristic) {
-        case HeuristicType::RANDOM:
+        case HeuristicType::RANDOM: {
             heuristic.update(trail, numVars);
             var = heuristic.pickRandomVar();
+            // Polarität für Random: Phase-Saving, sonst positiv
+            if (var >= 1 && var <= numVars && savedPhase[var] != -1) {
+                useNegated = (savedPhase[var] == 0);
+            } else {
+                useNegated = false;
+            }
             break;
-        case HeuristicType::JEROSLOW_WANG:
-            var = heuristic.pickJeroslowWangVar(assignment);
+        }
+        case HeuristicType::JEROSLOW_WANG: {
+            auto [v, neg] = heuristic.pickJeroslowWangVar(assignment); // pair<int,bool>
+            var = v;
+            useNegated = neg;
             break;
+        }
+        default: {
+            // Falls weitere Heuristiken dazukommen
+            break;
+        }
     }
 
-    // Guard: falls Heuristik nichts Sinnvolles liefert, nimm erstes unassigned
+    // Guard/Fallback: erste unbelegte Variable wählen, falls nötig
     if (var <= 0 || var > numVars || assignment[var] != -1) {
+        var = -1;
         for (int v = 1; v <= numVars; ++v) {
             if (assignment[v] == -1) { var = v; break; }
         }
-        if (var <= 0) var = 1; // sollte durch allVariablesAssigned() nie relevant sein
-    }
+        if (var == -1) var = 1; // sollte durch allVariablesAssigned() nie passieren
 
-    // Phase saving
-    bool useNegated;
-    if (savedPhase[var] == -1) {
-        useNegated = false;
-    } else {
+        // Fallback-Polarität: Phase-Saving, sonst positiv
         useNegated = (savedPhase[var] == 0);
     }
 

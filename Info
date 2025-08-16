@@ -1,3 +1,10 @@
+JW-vervollständigen:
+Ändern:
+- pickJeroslowWangVar
+- initializeJeroslowWang
+- updateJeroslowWang
+
+
 
 
 - CLI-Parameter einbauen
@@ -49,3 +56,5 @@ Solver Verbesserungen
 6. Optional:
    - Preprocessing-Hook für Unit Propagation vor Start
    - Logging für Debug und Benchmark-Modus trennen
+
+
