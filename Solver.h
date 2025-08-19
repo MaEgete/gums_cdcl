@@ -8,7 +8,7 @@
 
 struct Stats {
     uint64_t decisions=0, conflicts=0, propagations=0;
-    uint64_t learnts_added=0;
+    uint64_t learnts_added=0, restarts=0;
     uint64_t clause_inspections=0, watch_moves=0;
     uint64_t t_bcp_ms=0, t_analyze_ms=0;
 };
@@ -46,6 +46,12 @@ private:
     // assignment[i] = -1 (unbelegt), 0 (false), 1 (true), Index 0 ignorieren
     std::vector<int> assignment;
     std::vector<int> savedPhase; // -1 = unknown, 0 = prefer false (negated), 1 = prefer true (non-negated)
+
+    int restart_idx = 1;
+    int restart_base = 2;
+    int conflicts_since_restart = 0;
+    int restart_budget = 0;
+
 
 public:
     explicit Solver(int n);

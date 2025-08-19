@@ -1,10 +1,3 @@
-JW-vervollständigen:
-Ändern:
-- pickJeroslowWangVar
-- initializeJeroslowWang
-- updateJeroslowWang
-
-
 
 
 - CLI-Parameter einbauen
@@ -21,7 +14,14 @@ JW-vervollständigen:
         - https://rlgm.github.io/papers/32.pdf
     - Learning Local Search Heuristics for Boolean Satisfiability
         - https://www.cs.cmu.edu/~eyolcu/research/learning-local-search-heuristics-sat.pdf
-
+    - Evaluating CDCL Variable Scoring Schemes*
+        - https://cca.informatik.uni-freiburg.de/papers/BiereFroehlich-SAT15.pdf
+    - Understanding VSIDS Branching Heuristics in Conflict-Driven Clause-Learning SAT Solvers
+        - https://mk.cs.msu.ru/images/1/1f/SAT_SMT_Vijay_Ganesh_HVC2015.pdf
+    - Evaluating CDCL Restart Schemes --> (Luby drinnen)
+        - https://cca.informatik.uni-freiburg.de/papers/BiereFroehlich-POS15.pdf
+    - Optimal Speedup of Las Vegas Algorithms† --> (Luby drinnen)
+        - https://www.cs.utexas.edu/~diz/Sub%20Websites/Research/optimal_speedup_of_las_vegas_algorithms.pdf
     - Schauen, obs die Paper auch auf Arxiv.org gibt (wirklt vllt. seriöser)
 
 Solver Verbesserungen

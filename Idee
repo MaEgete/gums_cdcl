@@ -1,1 +1,16 @@
 Variante von JW machen
+
+
+
+
+
+Praxis-Checkliste für faire Vergleiche
+	1.	Alles fixieren außer der Heuristik: gleicher Restart-Plan (Luby), gleiche Deletion-Policy (LBD), gleiche Polarity-Regeln (Phase-saving), identische Propagation (2WL)
+	2.	Gleiche Seeds & Tiebreaks: z. B. Heap-Ties brechen mit kleinerer Var-ID; festen RNG-Seed loggen.
+	3.	Gleiches Benchmark-Set + Timeouts: z. B. 300 s/900 s; gleiche Hardware/Setting (1 Thread, Performance-Governor).
+	4.	Mehrfach laufen lassen: ≥3 Seeds je Instanz → Median/Geomean nehmen.
+	5.	Metriken loggen: Zeit, #Konflikte, #Entscheidungen, Prop/Dec, Ø-LBD, #Learnts.
+	6.	Score verwenden: #Solved, Median-Zeit, PAR-2 (Zeit + 2×Timeout für ungelöste).
+	7.	A/B-Ablation: EVSIDS ↔ CHB ↔ LRB ↔ VMTF – jeweils nur die Branching-Komponente tauschen.
+
+So weißt du:u „Der Unterschied kommt von der Heuristik – nicht vom Drumherum.“ Danach kannst du gezielt Restarts/Deletion variieren und sehen, mit welcher Umgebung deine Heuristik am besten harmoniert.

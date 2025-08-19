@@ -3,12 +3,30 @@
 
 #include <algorithm>
 #include <iostream>
+#include <cassert>
+
+// i >= 1
+int luby(int i) {
+    assert(i >= 1);
+    int k = 1;
+    // Finde k mit 2^k - 1 >= i
+    while (((1 << k) - 1) < i) ++k;
+
+    if (((1 << k) - 1) == i) {
+        return 1 << (k - 1);
+    }
+    // Rekursiver Fall
+    return luby(i - (1 << (k -1)) + 1);
+}
 
 Solver::Solver(int n) : numVars(n), assignment(numVars + 1, -1), savedPhase(numVars + 1, -1) {
     heuristic.initialize(numVars);
     //currentHeuristic = HeuristicType::RANDOM;
     currentHeuristic = HeuristicType::JEROSLOW_WANG; // JW-TS
     watchList.assign(2 * numVars, {}); // 2 Einträge je Variable (pos/neg)
+
+    restart_budget = restart_base * luby(restart_idx);
+    conflicts_since_restart = 0;
 }
 
 bool Solver::solve() {
@@ -35,6 +53,15 @@ bool Solver::solve() {
             int reason_idx = static_cast<int>(clauses.size()) - 1;
 
             assign(assertLit, backjumpLevel, reason_idx);
+            conflicts_since_restart++;
+            if (conflicts_since_restart >= restart_budget) {
+                backtrackToLevel(0);
+                restart_idx++;
+                restart_budget = restart_base * luby(restart_idx);
+                conflicts_since_restart = 0;
+                stats.restarts++;
+                continue;
+            }
             continue; // sofort weiter propagieren
         }
         else if (allVariablesAssigned()) {
@@ -313,6 +340,7 @@ void Solver::printStats() const {
       << " inspections=" << stats.clause_inspections
       << " watch_moves=" << stats.watch_moves
       << " t_bcp_ms=" << stats.t_bcp_ms
+      << " restarts=" << stats.restarts
       << "\n";
 }
 

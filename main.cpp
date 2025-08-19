@@ -8,7 +8,9 @@
 #include "CNFParser.h"
 #include "Solver.h"
 
+
 int main() {
+
     std::cout << "Ich bin der CDCL-SAT-Solver Gums" << std::endl;
 
     std::string pfad = "../examples/stundenplan.cnf"; // ggf. anpassen
