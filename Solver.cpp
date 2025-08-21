@@ -178,6 +178,7 @@ void Solver::assign(const Literal& lit, int level, int reason_idx) {
 
 std::tuple<Clause,int,Literal> Solver::analyzeConflict(const Clause* conflict) {
     ScopedTimer _t(stats.t_analyze_ms);
+    decayClauseInc(); // one decay per conflict
     Clause learnedClause = *conflict;
     const int currentLevel = decisionLevel;
 
@@ -207,6 +208,8 @@ std::tuple<Clause,int,Literal> Solver::analyzeConflict(const Clause* conflict) {
         const Clause* reason = (reason_idx >= 0 && reason_idx < static_cast<int>(clauses.size()))
                              ? &clauses[reason_idx] : nullptr;
         if (!reason) break; // defensiv
+        // bump activity of the reason clause used for resolution
+        if (reason) bumpClauseActivity(*const_cast<Clause*>(reason));
 
         // Auflösen über resolveLit
         std::vector<Literal> newLits;
@@ -230,6 +233,8 @@ std::tuple<Clause,int,Literal> Solver::analyzeConflict(const Clause* conflict) {
         learnedClause = Clause(std::move(newLits));
     }
 
+    // bump activity of the learned clause itself
+    bumpClauseActivity(learnedClause);
     // assertierendes Literal = einziges Literal der Klausel auf currentLevel
     Literal assertLit(0, false);
     for (const auto& l: learnedClause.getClause()) {
@@ -489,7 +494,7 @@ void Solver::seedRootUnits() {
 
 void Solver::reduceDB() {
     // --- Kandidaten sammeln: keine Units/Binaries, LBD>2, nicht locked ---
-    struct Candidate { size_t idx; int lbd; size_t sz; };
+    struct Candidate { size_t idx; int lbd; size_t sz; double act; };
     std::vector<Candidate> cand;
     cand.reserve(clauses.size());
 
@@ -507,17 +512,18 @@ void Solver::reduceDB() {
         const int lbd = c.getLBD();
         if (lbd <= 2) continue;             // sehr gute Klauseln behalten
         if (isLocked(i)) continue;          // Reason-Klauseln behalten
-        cand.push_back({i, lbd, sz});
+        cand.push_back({i, lbd, sz, clauses[i].getActivity()});
     }
 
     if (cand.size() < 2) return;
 
-    // Schlechteste zuerst: hohe LBD, dann längere Klausel
+    // Schlechteste zuerst: hohe LBD, dann niedrige Aktivität, dann längere Klausel
     std::sort(cand.begin(), cand.end(), [](const Candidate& a, const Candidate& b){
-        if (a.lbd != b.lbd) return a.lbd > b.lbd;
-        return a.sz > b.sz;
+        if (a.lbd != b.lbd) return a.lbd > b.lbd;   // higher LBD is worse
+        if (a.act != b.act) return a.act < b.act;   // lower activity is worse
+        return a.sz  > b.sz;                        // larger clauses are worse
     });
-    
+
 
     // Ungefähr die Hälfte der Kandidaten löschen
     size_t toRemove = cand.size() / 2;
@@ -567,4 +573,18 @@ void Solver::reduceDB() {
 
 void Solver::setHeuristicSeed(uint64_t s) {
     heuristic.setSeed(s);
+}
+
+void Solver::bumpClauseActivity(Clause &c) {
+    c.bumpActivity(clauseInc);
+    if (c.getActivity() > 1e100) { // Re-scale
+        for (auto& cl : clauses) {
+            cl.decayActivity(1e-100);
+        }
+        clauseInc *= 1e-100;
+    }
+}
+
+void Solver::decayClauseInc() {
+    clauseInc /= clauseDecay;
 }

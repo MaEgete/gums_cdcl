@@ -62,6 +62,9 @@ private:
     int conflicts_since_restart = 0;
     int restart_budget = 0;
 
+    double clauseInc = 1.0;
+    double clauseDecay = 0.999;
+
 
 public:
     explicit Solver(int n);
@@ -89,6 +92,9 @@ public:
     void reduceDB();
 
     void setHeuristicSeed(uint64_t s);
+
+    void bumpClauseActivity(Clause& c);
+    void decayClauseInc();
 };
 
 #endif // SOLVER_H

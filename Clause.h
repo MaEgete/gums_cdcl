@@ -18,6 +18,8 @@ private:
 
     int lbd = -1;
 
+    double activity = 0.0;
+
 public:
     explicit Clause(std::vector<Literal> cla = {});
 
@@ -44,6 +46,18 @@ public:
     int getLBD() const;
 
     int computeLBD(const Trail& trail) const;
+
+    double getActivity() const {
+        return activity;
+    }
+
+    void bumpActivity(double inc) {
+        activity += inc;
+    }
+
+    void decayActivity(double decay) {
+        activity *= decay;
+    }
 };
 
 #endif // CLAUSE_H
