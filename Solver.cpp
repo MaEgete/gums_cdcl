@@ -23,7 +23,7 @@ int luby(int i) {
 Solver::Solver(int n) : numVars(n), assignment(numVars + 1, -1), savedPhase(numVars + 1, -1) {
     heuristic.initialize(numVars);
     //currentHeuristic = HeuristicType::RANDOM;
-    currentHeuristic = HeuristicType::JEROSLOW_WANG; // JW-TS
+    //currentHeuristic = HeuristicType::JEROSLOW_WANG; // JW-TS
     watchList.assign(2 * numVars, {}); // 2 Einträge je Variable (pos/neg)
 
     restart_budget = restart_base * luby(restart_idx);
@@ -381,9 +381,21 @@ void Solver::printStats() const {
         << " lbd_ge5=" << stats.learnt_lbd_ge5
         << " deleted=" << stats.deleted_count
         << " deleted_lbd_sum=" << stats.deleted_lbd_sum
+        << " heuristic=" << heuristicToString(currentHeuristic)
         << "\n";
 }
 
+std::string Solver::heuristicToString(HeuristicType type) {
+    switch (type) {
+        case HeuristicType::JEROSLOW_WANG:
+            return "Jeroslow_Wang";
+            break;
+        case HeuristicType::RANDOM:
+            return "Random";
+            break;
+    }
+    return "None";
+}
 
 Clause* Solver::propagateLiteralFalse(const Literal &falsified) {
     // Nur Klauseln betrachten, die das aktuell falsifizierte Literal beobachten

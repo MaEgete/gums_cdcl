@@ -95,6 +95,8 @@ public:
 
     void bumpClauseActivity(Clause& c);
     void decayClauseInc();
+
+    static std::string heuristicToString(HeuristicType type) ;
 };
 
 #endif // SOLVER_H
