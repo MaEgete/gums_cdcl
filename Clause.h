@@ -6,6 +6,8 @@
 #include <iostream>
 #include "Literal.h"
 
+class Trail;
+
 class Clause {
 private:
     std::vector<Literal> clause;
@@ -13,6 +15,8 @@ private:
     // Indizes der zwei beobachteten Literale (-1 = uninitialisiert)
     int w0 = -1;
     int w1 = -1;
+
+    int lbd = -1;
 
 public:
     explicit Clause(std::vector<Literal> cla = {});
@@ -35,6 +39,11 @@ public:
     const std::vector<Literal>& getClause() const;
 
     friend std::ostream& operator<<(std::ostream& os, const Clause& clause);
+
+    void setLBD(int lbdVal);
+    int getLBD() const;
+
+    int computeLBD(const Trail& trail) const;
 };
 
 #endif // CLAUSE_H

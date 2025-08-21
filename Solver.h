@@ -11,6 +11,16 @@ struct Stats {
     uint64_t learnts_added=0, restarts=0;
     uint64_t clause_inspections=0, watch_moves=0;
     uint64_t t_bcp_ms=0, t_analyze_ms=0;
+
+    // --- LBD statistics ---
+    uint64_t learnt_lbd_sum   = 0;  // Summe der LBDs gelernter Klauseln
+    uint64_t learnt_lbd_count = 0;  // Anzahl gelernter Klauseln (für die LBD berechnet wurde)
+    uint64_t learnt_lbd_le2   = 0;  // #gelernter Klauseln mit LBD <= 2
+    uint64_t learnt_lbd_3_4   = 0;  // #gelernter Klauseln mit LBD in {3,4}
+    uint64_t learnt_lbd_ge5   = 0;  // #gelernter Klauseln mit LBD >= 5
+
+    uint64_t deleted_count    = 0;  // #gelöschter Klauseln in reduceDB
+    uint64_t deleted_lbd_sum  = 0;  // Summe der LBDs gelöschter Klauseln
 };
 
 enum class HeuristicType {
@@ -75,6 +85,10 @@ public:
     Clause* propagate();             // neue Propagation mit 2WL
     void    attachExistingClauses(); // falls Clauses schon im Vektor sind
     void    seedRootUnits();         // root-level Units vorab enqueuen
+
+    void reduceDB();
+
+    void setHeuristicSeed(uint64_t s);
 };
 
 #endif // SOLVER_H

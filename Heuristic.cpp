@@ -118,3 +118,7 @@ void Heuristic::initialize(int numVars) {
     unassignedVars.clear();
     for (int v = 1; v <= numVars; ++v) unassignedVars.insert(v);
 }
+
+void Heuristic::setSeed(uint64_t s) {
+    rng.seed(s);
+}

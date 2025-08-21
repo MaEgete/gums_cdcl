@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <iostream>
 #include <cassert>
+#include <unordered_set>
 
 // i >= 1
 int luby(int i) {
@@ -48,8 +49,32 @@ bool Solver::solve() {
             auto [learnedClause, backjumpLevel, assertLit] = analyzeConflict(conflict);
             backtrackToLevel(backjumpLevel);
 
+            // LBD berechnen, in Klausel schreiben und Stats updaten
+            const int lbd = learnedClause.computeLBD(trail);
+            learnedClause.setLBD(lbd);
+            stats.learnt_lbd_sum   += static_cast<uint64_t>(lbd);
+            stats.learnt_lbd_count += 1;
+            if (lbd <= 2)      stats.learnt_lbd_le2 += 1;
+            else if (lbd <= 4) stats.learnt_lbd_3_4 += 1;
+            else               stats.learnt_lbd_ge5 += 1;
+
+            // Reorder: assertierendes Literal an Index 0
+            {
+                std::vector<Literal> tmp;
+                tmp.reserve(learnedClause.size());
+                tmp.push_back(assertLit);
+                for (const auto& l : learnedClause.getClause()) {
+                    if (!(l.getVar() == assertLit.getVar() && l.isNegated() == assertLit.isNegated()))
+                        tmp.push_back(l);
+                }
+                learnedClause = Clause(std::move(tmp));
+            }
+
             addClause(learnedClause);
             stats.learnts_added++;
+            if ((stats.learnts_added % 200) == 0) {
+                reduceDB();
+            }
             int reason_idx = static_cast<int>(clauses.size()) - 1;
 
             assign(assertLit, backjumpLevel, reason_idx);
@@ -253,41 +278,41 @@ void Solver::attachExistingClauses() {
 Literal Solver::pickBranchingVariable() {
     int  var        = -1;
     bool useNegated = false;
+    bool jwNegHint  = false; // nur als Fallback, falls noch keine Phase gespeichert
 
     switch (currentHeuristic) {
         case HeuristicType::RANDOM: {
             heuristic.update(trail, numVars);
             var = heuristic.pickRandomVar();
-            // Polarität für Random: Phase-Saving, sonst positiv
-            if (var >= 1 && var <= numVars && savedPhase[var] != -1) {
-                useNegated = (savedPhase[var] == 0);
-            } else {
-                useNegated = false;
-            }
             break;
         }
         case HeuristicType::JEROSLOW_WANG: {
-            auto [v, neg] = heuristic.pickJeroslowWangVar(assignment); // pair<int,bool>
+            auto [v, neg] = heuristic.pickJeroslowWangVar(assignment);
             var = v;
-            useNegated = neg;
+            jwNegHint = neg;      // nur nutzen, wenn savedPhase[var] noch unbekannt ist
             break;
         }
         default: {
-            // Falls weitere Heuristiken dazukommen
             break;
         }
     }
 
-    // Guard/Fallback: erste unbelegte Variable wählen, falls nötig
+    // Guard/Fallback: erste unbelegte Variable suchen
     if (var <= 0 || var > numVars || assignment[var] != -1) {
         var = -1;
         for (int v = 1; v <= numVars; ++v) {
             if (assignment[v] == -1) { var = v; break; }
         }
-        if (var == -1) var = 1; // sollte durch allVariablesAssigned() nie passieren
+        if (var == -1) var = 1;
+    }
 
-        // Fallback-Polarität: Phase-Saving, sonst positiv
-        useNegated = (savedPhase[var] == 0);
+    // Polarity-Regel:
+    // - Wenn Phase-Saving schon eine Phase kennt, nutze die (fair & stabil).
+    // - Sonst (nur beim ersten Mal) nimm die JW-Empfehlung.
+    if (savedPhase[var] != -1) {
+        useNegated = (savedPhase[var] == 0);   // 0 == zuletzt NEGATIV
+    } else {
+        useNegated = jwNegHint;
     }
 
     return Literal{var, useNegated};
@@ -318,6 +343,10 @@ void Solver::addClause(const Clause& clause) {
         if (c.watch1() != -1) attachClause(idx, c.at(c.watch1()));
     }
 
+    if (c.getLBD() < 0) {
+        c.setLBD(c.computeLBD(trail));
+    }
+
     if (currentHeuristic == HeuristicType::JEROSLOW_WANG) {
         heuristic.updateJeroslowWang(c);
     }
@@ -333,15 +362,21 @@ void Solver::printModel() const {
 
 void Solver::printStats() const {
     std::cout << "Stats:\n"
-      << "decisions=" << stats.decisions
-      << " conflicts=" << stats.conflicts
-      << " propagations=" << stats.propagations
-      << " learnts_added=" << stats.learnts_added
-      << " inspections=" << stats.clause_inspections
-      << " watch_moves=" << stats.watch_moves
-      << " t_bcp_ms=" << stats.t_bcp_ms
-      << " restarts=" << stats.restarts
-      << "\n";
+        << "decisions=" << stats.decisions
+        << " conflicts=" << stats.conflicts
+        << " propagations=" << stats.propagations
+        << " learnts_added=" << stats.learnts_added
+        << " inspections=" << stats.clause_inspections
+        << " watch_moves=" << stats.watch_moves
+        << " t_bcp_ms=" << stats.t_bcp_ms
+        << " restarts=" << stats.restarts
+        << " lbd_avg=" << (stats.learnt_lbd_count ? (double)stats.learnt_lbd_sum / (double)stats.learnt_lbd_count : 0.0)
+        << " lbd_le2=" << stats.learnt_lbd_le2
+        << " lbd_3_4=" << stats.learnt_lbd_3_4
+        << " lbd_ge5=" << stats.learnt_lbd_ge5
+        << " deleted=" << stats.deleted_count
+        << " deleted_lbd_sum=" << stats.deleted_lbd_sum
+        << "\n";
 }
 
 
@@ -450,4 +485,85 @@ void Solver::seedRootUnits() {
             }
         }
     }
+}
+
+void Solver::reduceDB() {
+    // --- Kandidaten sammeln: keine Units/Binaries, LBD>2, nicht locked ---
+    struct Candidate { size_t idx; int lbd; size_t sz; };
+    std::vector<Candidate> cand;
+    cand.reserve(clauses.size());
+
+    auto isLocked = [&](size_t cidx) -> bool {
+        for (const auto& e : trail.getTrail()) {
+            if (e.reason_idx == static_cast<int>(cidx)) return true;
+        }
+        return false;
+    };
+
+    for (size_t i = 0; i < clauses.size(); ++i) {
+        Clause& c = clauses[i];
+        const size_t sz = c.size();
+        if (sz <= 2) continue;              // Units/Binaries behalten
+        const int lbd = c.getLBD();
+        if (lbd <= 2) continue;             // sehr gute Klauseln behalten
+        if (isLocked(i)) continue;          // Reason-Klauseln behalten
+        cand.push_back({i, lbd, sz});
+    }
+
+    if (cand.size() < 2) return;
+
+    // Schlechteste zuerst: hohe LBD, dann längere Klausel
+    std::sort(cand.begin(), cand.end(), [](const Candidate& a, const Candidate& b){
+        if (a.lbd != b.lbd) return a.lbd > b.lbd;
+        return a.sz > b.sz;
+    });
+
+    // Ungefähr die Hälfte der Kandidaten löschen
+    size_t toRemove = cand.size() / 2;
+    if (toRemove == 0) return;
+
+    // LBD-Stats für die zu löschenden Kandidaten sammeln
+    for (size_t k = 0; k < toRemove; ++k) {
+        stats.deleted_count   += 1;
+        stats.deleted_lbd_sum += static_cast<uint64_t>(cand[k].lbd);
+    }
+
+    // Markiere zu löschende Klauseln
+    std::vector<bool> mark(clauses.size(), false);
+    for (size_t k = 0; k < toRemove; ++k) {
+        mark[cand[k].idx] = true;
+    }
+
+    // Watches der Klausel abmelden
+    auto detachBothWatches = [&](size_t cidx) {
+        Clause& C = clauses[cidx];
+        int w0 = C.watch0();
+        int w1 = C.watch1();
+        if (w0 != -1) detachClause(cidx, C.at(w0));
+        if (w1 != -1) detachClause(cidx, C.at(w1));
+    };
+
+    // Nach Erase: alle Watch-Listen-Indizes > removedIdx dekrementieren
+    auto adjustWatchListsAfterErase = [&](size_t removedIdx) {
+        for (auto& wl : watchList) {
+            for (auto& idx : wl) {
+                if (idx > removedIdx) --idx;
+            }
+        }
+    };
+
+    // Rückwärts löschen (stabile Indizes) + Watchlisten anpassen
+    size_t i = clauses.size();
+    while (i > 0) {
+        --i; // dekrementiere zuerst
+        if (!mark[i]) continue;
+        detachBothWatches(i);
+        clauses.erase(clauses.begin() + i);
+        adjustWatchListsAfterErase(i);
+        // Trail-Reason-Anpassungen nicht nötig: locked-Klauseln wurden ausgeschlossen
+    }
+}
+
+void Solver::setHeuristicSeed(uint64_t s) {
+    heuristic.setSeed(s);
 }
