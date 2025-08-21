@@ -517,6 +517,7 @@ void Solver::reduceDB() {
         if (a.lbd != b.lbd) return a.lbd > b.lbd;
         return a.sz > b.sz;
     });
+    
 
     // Ungefähr die Hälfte der Kandidaten löschen
     size_t toRemove = cand.size() / 2;
