@@ -5,6 +5,7 @@
 #include <iostream>
 #include <cassert>
 #include <unordered_set>
+#include <iomanip>
 
 // i >= 1
 int luby(int i) {
@@ -52,11 +53,11 @@ bool Solver::solve() {
             // LBD berechnen, in Klausel schreiben und Stats updaten
             const int lbd = learnedClause.computeLBD(trail);
             learnedClause.setLBD(lbd);
-            stats.learnt_lbd_sum   += static_cast<uint64_t>(lbd);
-            stats.learnt_lbd_count += 1;
-            if (lbd <= 2)      stats.learnt_lbd_le2 += 1;
-            else if (lbd <= 4) stats.learnt_lbd_3_4 += 1;
-            else               stats.learnt_lbd_ge5 += 1;
+            stats.learnt_lbd_sum += static_cast<uint64_t>(lbd);
+            stats.learnt_lbd_count++;
+            if (lbd <= 2)      stats.learnt_lbd_le2++;
+            else if (lbd <= 4) stats.learnt_lbd_3_4++;
+            else               stats.learnt_lbd_ge5++;
 
             // Reorder: assertierendes Literal an Index 0
             {
@@ -366,23 +367,24 @@ void Solver::printModel() const {
 }
 
 void Solver::printStats() const {
-    std::cout << "Stats:\n"
-        << "decisions=" << stats.decisions
-        << " conflicts=" << stats.conflicts
-        << " propagations=" << stats.propagations
-        << " learnts_added=" << stats.learnts_added
-        << " inspections=" << stats.clause_inspections
-        << " watch_moves=" << stats.watch_moves
-        << " t_bcp_ms=" << stats.t_bcp_ms
-        << " restarts=" << stats.restarts
-        << " lbd_avg=" << (stats.learnt_lbd_count ? (double)stats.learnt_lbd_sum / (double)stats.learnt_lbd_count : 0.0)
-        << " lbd_le2=" << stats.learnt_lbd_le2
-        << " lbd_3_4=" << stats.learnt_lbd_3_4
-        << " lbd_ge5=" << stats.learnt_lbd_ge5
-        << " deleted=" << stats.deleted_count
-        << " deleted_lbd_sum=" << stats.deleted_lbd_sum
-        << " heuristic=" << heuristicToString(currentHeuristic)
-        << "\n";
+    std::cout << "\n========== Solver Statistics ==========\n";
+    std::cout << std::left << std::setw(20) << "Decisions:"       << stats.decisions << "\n";
+    std::cout << std::left << std::setw(20) << "Conflicts:"       << stats.conflicts << "\n";
+    std::cout << std::left << std::setw(20) << "Propagations:"    << stats.propagations << "\n";
+    std::cout << std::left << std::setw(20) << "Learnts added:"   << stats.learnts_added << "\n";
+    std::cout << std::left << std::setw(20) << "Inspections:"     << stats.clause_inspections << "\n";
+    std::cout << std::left << std::setw(20) << "Watch moves:"     << stats.watch_moves << "\n";
+    std::cout << std::left << std::setw(20) << "BCP time (ms):"   << stats.t_bcp_ms << "\n";
+    std::cout << std::left << std::setw(20) << "Analyze time (ms):" << stats.t_analyze_ms << "\n";
+    std::cout << std::left << std::setw(20) << "Restarts:"        << stats.restarts << "\n";
+    std::cout << std::left << std::setw(20) << "LBD avg:"         << (stats.learnt_lbd_count ? (double)stats.learnt_lbd_sum / (double)stats.learnt_lbd_count : 0.0) << "\n";
+    std::cout << std::left << std::setw(20) << "LBD <= 2:"        << stats.learnt_lbd_le2 << "\n";
+    std::cout << std::left << std::setw(20) << "LBD 3-4:"         << stats.learnt_lbd_3_4 << "\n";
+    std::cout << std::left << std::setw(20) << "LBD >= 5:"        << stats.learnt_lbd_ge5 << "\n";
+    std::cout << std::left << std::setw(20) << "Deleted clauses:" << stats.deleted_count << "\n";
+    std::cout << std::left << std::setw(20) << "Deleted LBD sum:" << stats.deleted_lbd_sum << "\n";
+    std::cout << std::left << std::setw(20) << "Heuristic:"       << heuristicToString(currentHeuristic) << "\n";
+    std::cout << "=======================================\n\n";
 }
 
 std::string Solver::heuristicToString(HeuristicType type) {
@@ -417,7 +419,7 @@ Clause* Solver::propagateLiteralFalse(const Literal &falsified) {
         // Sicherheitsabfrage
         if (wIdx == -1) { ++i; continue; }
 
-        // WICHTIGER FIX: otherIdx aus w0/w1 ermitteln, nicht aus wIdx (0/1)!
+        // otherIdx aus w0/w1 ermitteln
         const int otherIdx = (wIdx == 0 ? w1 : w0);
 
         const Literal& other = C->at(otherIdx);

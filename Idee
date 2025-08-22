@@ -14,3 +14,19 @@ Praxis-Checkliste für faire Vergleiche
 	7.	A/B-Ablation: EVSIDS ↔ CHB ↔ LRB ↔ VMTF – jeweils nur die Branching-Komponente tauschen.
 
 So weißt du:u „Der Unterschied kommt von der Heuristik – nicht vom Drumherum.“ Danach kannst du gezielt Restarts/Deletion variieren und sehen, mit welcher Umgebung deine Heuristik am besten harmoniert.
+
+
+
+
+	3.	Pair-based Heuristik (vorbereitete Variablenpaare)
+→ das ist ziemlich speziell und meines Wissens nach noch nicht systematisch bearbeitet.
+Es gibt zwar Clause-Decomposition Ansätze (BCD), aber nicht explizit „Pair-Scores“ in der Variablenwahl.
+👉 Hohe Eigenständigkeit, eher riskant (du musst viel selbst entwerfen), aber spannend.
+	4.	Phase-Saving mit Bias (häufigste statt letzte Phase, oder Mischung mit JW-Hinweis)
+→ hab ich in der Literatur so noch nicht gesehen.
+Phase-Saving ist Standard, aber kaum variiert worden.
+👉 Klein, machbar, und ziemlich sicher noch nicht systematisch untersucht.
+	5.	Conflict Contribution Score (UIP-basiert)
+→ klingt neu, habe ich so nicht gefunden.
+Es gibt zwar „Learning Rate Branching“, aber das misst etwas anderes (Nützlichkeit pro Entscheidung, nicht speziell UIP-Häufigkeit).
+👉 Eher neu, aber riskant, weil man definieren muss, wie man das effizient misst.

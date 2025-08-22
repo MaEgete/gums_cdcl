@@ -1,6 +1,6 @@
 
 
-- CLI-Parameter einbauen
+
 
 - Weitere Heuristiken (Paper) anschauen:
 
@@ -25,7 +25,18 @@
     - Predicting Learnt Clauses Quality in Modern SAT Solvers∗ --> (LBD drinnen)
         - https://www.ijcai.org/Proceedings/09/Papers/074.pdf
 
-    - Schauen, obs die Paper auch auf Arxiv.org gibt (wirklt vllt. seriöser)
+    - Glucose:
+        - "Predicting Learnt Clauses Quality in Modern SAT Solver". Gilles Audemard, Laurent Simon, in Twenty-first International Joint Conference on Artificial Intelligence (IJCAI'09), july 2009.
+        - "Glucose: a solver that predicts learnt clauses quality". Gilles Audemard, Laurent Simon, SAT Competition, 2009.
+        - "GLUCOSE 2.1: Aggressive – but Reactive – Clause Database Management, Dynamic Restarts". In Pragmatics of SAT (Workshop of SAT'12), Gilles Audemard and Laurent Simon, Juin 2012.
+        - "Glucose in the SAT 2014 Competition". Gilles Audemard, Laurent Simon, SAT Competition, 2014.
+        - "Glucose and Syrup in the SAT Race 2015". Gilles Audemard, Laurent Simon, SAT race 2015.
+        - "Extreme cases in SAT problems". Gilles Audemard, Laurent Simonn in International Conference on Theory and Applications of Satisfiability Testing (SAT'16), 2016.
+        - "Glucose and Syrup in the SAT’17". Gilles Audemard, Laurent Simon, SAT competition 2017.
+        - "Glucose and syrup: Nine years in the sat competitions". illes Audemard, Laurent Simon, SAT competition 2018.
+        - "On the glucose SAT solver". Gilles Audemard, Laurent Simon, International Journal on Artificial Intelligence Tools 27 (01), 2018
+
+    - Schauen, obs die Paper auch auf Arxiv.org gibt (wirkt vllt. seriöser)
 
 Solver Verbesserungen
 
