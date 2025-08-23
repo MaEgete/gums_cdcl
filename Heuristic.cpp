@@ -122,3 +122,7 @@ void Heuristic::initialize(int numVars) {
 void Heuristic::setSeed(uint64_t s) {
     rng.seed(s);
 }
+
+int Heuristic::VSIDS() {
+
+}

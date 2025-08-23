@@ -21,7 +21,14 @@ int luby(int i) {
     return luby(i - (1 << (k -1)) + 1);
 }
 
-Solver::Solver(int n) : numVars(n), assignment(numVars + 1, -1), savedPhase(numVars + 1, -1) {
+Solver::Solver(int n)
+        : numVars(n),
+        assignment(numVars + 1, -1),
+        savedPhase(numVars + 1, -1),
+        activity(numVars + 1, 0.0),
+        pos(numVars + 1, -1)
+    {
+
     heuristic.initialize(numVars);
     //currentHeuristic = HeuristicType::RANDOM;
     //currentHeuristic = HeuristicType::JEROSLOW_WANG; // JW-TS

@@ -30,6 +30,9 @@ public:
     void initializeJeroslowWang(const std::vector<Clause>& clauses, int numVars);
     // Aktualisiert die Scores für eine einzelne neue Klausel
     void updateJeroslowWang(const Clause& newClause);
+
+
+    int VSIDS();
 };
 
 #endif // HEURISTIC_H

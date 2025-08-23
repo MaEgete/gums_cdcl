@@ -16,7 +16,7 @@
         - https://www.cs.cmu.edu/~eyolcu/research/learning-local-search-heuristics-sat.pdf
     - Evaluating CDCL Variable Scoring Schemes*
         - https://cca.informatik.uni-freiburg.de/papers/BiereFroehlich-SAT15.pdf
-    - Understanding VSIDS Branching Heuristics in Conflict-Driven Clause-Learning SAT Solvers
+    - Understanding VSIDS Branching Heuristics in Conflict-Driven Clause-Learning SAT Solvers --> (adaptVSIDS drinnen)
         - https://mk.cs.msu.ru/images/1/1f/SAT_SMT_Vijay_Ganesh_HVC2015.pdf
     - Evaluating CDCL Restart Schemes --> (Luby drinnen)
         - https://cca.informatik.uni-freiburg.de/papers/BiereFroehlich-POS15.pdf

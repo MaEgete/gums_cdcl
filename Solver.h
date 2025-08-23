@@ -33,18 +33,24 @@ enum class HeuristicType {
 class Solver {
 private:
 
+    // Statistiken
     Stats stats;
 
     int numVars;
     // Für jedes Literal (inkl. Negation) eine Liste beobachtender Klauseln (Indices)
     std::vector<std::vector<size_t>> watchList;
+
     size_t qhead = 0; // Index ins Trail: bis wohin wurde propagiert?
 
     int     litToIndex(const Literal& l) const; // mappe Literal -> [0 .. 2*numVars-1]
     Literal negate(const Literal& l) const;
 
+    // Klausel an das Literal attachen, welches die Klausel gerade beobachtet
     void    attachClause(size_t clauseIdx, const Literal& w);
+    // Klausel detachen, wenn die Klausel das Literal nicht mehr beobachtet
     void    detachClause(size_t clauseIdx, const Literal& w);
+
+    // Unit Propagation für 2-Watched-Literals
     Clause* propagateLiteralFalse(const Literal& falsified);
 
     std::vector<Clause> clauses;
@@ -55,15 +61,26 @@ private:
 
     // assignment[i] = -1 (unbelegt), 0 (false), 1 (true), Index 0 ignorieren
     std::vector<int> assignment;
-    std::vector<int> savedPhase; // -1 = unknown, 0 = prefer false (negated), 1 = prefer true (non-negated)
 
+    // -1 = unknown, 0 = prefer false (negated), 1 = prefer true (non-negated)
+    std::vector<int> savedPhase;
+
+    // --- Luby ---
     int restart_idx = 1;
     int restart_base = 2;
     int conflicts_since_restart = 0;
     int restart_budget = 0;
 
-    double clauseInc = 1.0;
-    double clauseDecay = 0.999;
+    // -- Deletion-Policy Glucose-Style ---
+    double clauseInc = 1.0;         // Start-Inkrement für Klauseln
+    double clauseDecay = 0.999;     // Decay für Klauseln
+
+    // -- Activities für VSIDS --
+    std::vector<double> activity;   // Score jeder Variable (Index = Variablen-ID)
+    std::vector<int> heap;          // MaxHeap (Ordnung basiert auf activity[v] (absteigend))
+    std::vector<int> pos;           // Speichert, an welcher Position im Heap eine Variable liegt (-1 falls nicht im Heap)
+    double var_inc = 1.0;           // Start-Inkrement für Variablen
+    double var_decay = 0.999;       // Decay für Variablen
 
 
 public:
@@ -89,14 +106,21 @@ public:
     void    attachExistingClauses(); // falls Clauses schon im Vektor sind
     void    seedRootUnits();         // root-level Units vorab enqueuen
 
+    // Deletion-Policy
     void reduceDB();
 
+    // Seed für die Random-Heuristik setzen
     void setHeuristicSeed(uint64_t s);
 
+    // Activity der Klausel inkrementieren
     void bumpClauseActivity(Clause& c);
+    // Zerfall der Activity der Klauseln
     void decayClauseInc();
 
-    static std::string heuristicToString(HeuristicType type) ;
+    // Ausgabe für Stats
+    static std::string heuristicToString(HeuristicType type);
+
+
 };
 
 #endif // SOLVER_H
