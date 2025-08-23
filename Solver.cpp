@@ -188,6 +188,23 @@ std::tuple<Clause,int,Literal> Solver::analyzeConflict(const Clause* conflict) {
     ScopedTimer _t(stats.t_analyze_ms);
     decayClauseInc(); // one decay per conflict
     Clause learnedClause = *conflict;
+
+    // VSIDS (mVSIDS)
+    std::vector<char> seen_vars(numVars + 1, 0);
+    std::vector<int> seen_list;
+    seen_list.reserve(32);
+
+    auto markSeen = [&](int v) {
+        if (v >= 1 && v <= numVars && !seen_vars[v]) {
+            seen_vars[v] = 1;
+            seen_list.push_back(v);
+        }
+    };
+
+    for (const auto& l : learnedClause.getClause()) {
+        markSeen(l.getVar());
+    }
+
     const int currentLevel = decisionLevel;
 
     auto countAtLevel = [&](int lvl) {
@@ -218,6 +235,16 @@ std::tuple<Clause,int,Literal> Solver::analyzeConflict(const Clause* conflict) {
         if (!reason) break; // defensiv
         // bump activity of the reason clause used for resolution
         if (reason) bumpClauseActivity(*const_cast<Clause*>(reason));
+
+
+        // VSIDS: alle Variablen aus reason und aktueller learnedClause markieren
+        for (const auto& l : reason->getClause()) {
+            markSeen(l.getVar());
+        }
+        for (const auto& l : learnedClause.getClause()) {
+            markSeen(l.getVar());
+        }
+
 
         // Auflösen über resolveLit
         std::vector<Literal> newLits;
@@ -252,6 +279,8 @@ std::tuple<Clause,int,Literal> Solver::analyzeConflict(const Clause* conflict) {
         }
     }
 
+
+
     // Backjump-Level = max Level der übrigen Literale (≠ currentLevel)
     int backjumpLevel = 0;
     for (const auto& l : learnedClause.getClause()) {
@@ -259,12 +288,26 @@ std::tuple<Clause,int,Literal> Solver::analyzeConflict(const Clause* conflict) {
         if (lvl != currentLevel) backjumpLevel = std::max(backjumpLevel, lvl);
     }
 
+    // VSIDS: alle gesehenen Variablen bumpen, dann global einmal decayn
+    if (currentHeuristic == HeuristicType::VSIDS) {
+        for (int v : seen_list) {
+            vsidsBump(v);
+        }
+        vsidsDecayInc();
+    }
+
     return {learnedClause, backjumpLevel, assertLit};
 }
 
 void Solver::backtrackToLevel(int level) {
     auto popped = trail.popAboveLevel(level);
-    for (int var : popped) assignment[var] = -1;
+    for (int var : popped) {
+        assignment[var] = -1;
+        if (currentHeuristic == HeuristicType::VSIDS && pos[var] == -1) {
+            heapInsert(var);
+        }
+    }
+
     decisionLevel = level;
 
     // qhead darf nie größer als die aktuelle Trail-Länge sein
@@ -303,6 +346,10 @@ Literal Solver::pickBranchingVariable() {
             auto [v, neg] = heuristic.pickJeroslowWangVar(assignment);
             var = v;
             jwNegHint = neg;      // nur nutzen, wenn savedPhase[var] noch unbekannt ist
+            break;
+        }
+        case HeuristicType::VSIDS: {
+            var = vsidsPickVar();
             break;
         }
         default: {
@@ -401,6 +448,9 @@ std::string Solver::heuristicToString(HeuristicType type) {
             break;
         case HeuristicType::RANDOM:
             return "Random";
+            break;
+        case HeuristicType::VSIDS:
+            return "VSIDS";
             break;
     }
     return "None";
@@ -608,4 +658,100 @@ void Solver::bumpClauseActivity(Clause &c) {
 
 void Solver::decayClauseInc() {
     clauseInc /= clauseDecay;
+}
+
+void Solver::vsidsBump(int v) {
+    activity[v] += var_inc;
+    if (activity[v] > 1e100) {
+        for (int u = 1; u <= numVars; ++u) {
+            activity[u] *= 1e-100;
+        }
+        var_inc *= 1e-100;
+    }
+    if (pos[v] != -1) {
+        heapIncreaseKey(v);
+    }
+    else if (assignment[v] == -1) {
+        heapInsert(v);
+    }
+}
+
+void Solver::vsidsDecayInc() {
+    var_inc /= var_decay;
+}
+
+int Solver::vsidsPickVar() {
+    while (!heap.empty()) {
+        int v = heapTop();
+        if (assignment[v] == -1) { // nur gültig, wenn unassigned
+            return v;
+        }
+        heapPop(); // ungültig: schon assigned
+    }
+    return -1;
+}
+
+int Solver::heapTop() {
+    return heap.empty() ? -1 : heap[0];
+}
+
+void Solver::heapPop() {
+    int v = heap[0];
+    int last = heap.back();
+    heap.pop_back();
+    pos[v] = -1;
+
+    if (!heap.empty()) {
+        heap[0] = last;
+        pos[last] = 0;
+        heapifyDown(0);
+    }
+}
+
+void Solver::heapifyUp(int i) {
+    while (i > 0) {
+        int parent = (i - 1) / 2;
+        if (activity[heap[parent]] >= activity[heap[i]]) {
+            break;
+        }
+        std::swap(heap[parent], heap[i]);
+        pos[heap[parent]] = parent;
+        pos[heap[i]] = i;
+        i = parent;
+    }
+}
+
+void Solver::heapifyDown(int i) {
+    int n = heap.size();
+    while (true) {
+        int left = 2*i + 1;
+        int right = 2*i + 2;
+        int largest = i;
+
+        if (left < n && activity[heap[left]] > activity[heap[largest]]) {
+            largest = left;
+        }
+        if (right < n && activity[heap[right]] > activity[heap[largest]]) {
+            largest = right;
+        }
+
+        if (largest == i) break;
+
+        std::swap(heap[i], heap[largest]);
+        pos[heap[i]] = i;
+        pos[heap[largest]] = largest;
+        i = largest;
+    }
+}
+
+void Solver::heapInsert(int v) {
+    heap.push_back(v);
+    int i = heap.size() -1;
+    pos[v] = i;
+    heapifyUp(i);
+}
+
+void Solver::heapIncreaseKey(int v) {
+    int i = pos[v];
+    heapifyUp(i);
 }

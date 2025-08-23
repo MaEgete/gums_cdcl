@@ -25,7 +25,8 @@ struct Stats {
 
 enum class HeuristicType {
     RANDOM,
-    JEROSLOW_WANG
+    JEROSLOW_WANG,
+    VSIDS,
 };
 
 
@@ -73,14 +74,14 @@ private:
 
     // -- Deletion-Policy Glucose-Style ---
     double clauseInc = 1.0;         // Start-Inkrement für Klauseln
-    double clauseDecay = 0.999;     // Decay für Klauseln
+    double clauseDecay = 0.95;     // Decay für Klauseln
 
     // -- Activities für VSIDS --
     std::vector<double> activity;   // Score jeder Variable (Index = Variablen-ID)
     std::vector<int> heap;          // MaxHeap (Ordnung basiert auf activity[v] (absteigend))
     std::vector<int> pos;           // Speichert, an welcher Position im Heap eine Variable liegt (-1 falls nicht im Heap)
     double var_inc = 1.0;           // Start-Inkrement für Variablen
-    double var_decay = 0.999;       // Decay für Variablen
+    double var_decay = 0.95;       // Decay für Variablen
 
 
 public:
@@ -120,6 +121,32 @@ public:
     // Ausgabe für Stats
     static std::string heuristicToString(HeuristicType type);
 
+    // Activity der Variabel inkrementieren
+    void vsidsBump(int v);
+
+    // Zerfall der Activity der Variablen
+    void vsidsDecayInc();
+
+    // Auswahl der Variable
+    int vsidsPickVar();
+
+    // Rückgabe des ersten Elements auf dem Heap
+    int heapTop();
+
+    // Entfernen des ersten Elements auf dem Heap
+    void heapPop();
+
+    // Neues / geupdatetetes Element richtig nach oben in die Liste setzen (Binärbaum)
+    void heapifyUp(int i);
+
+    // Neues / geupdatetetes Element richtig nach unten in die Liste setzen (Binärbaum)
+    void heapifyDown(int i);
+
+    // In den Heap einfügen
+    void heapInsert(int v);
+
+    // Heap updaten
+    void heapIncreaseKey(int v);
 
 };
 

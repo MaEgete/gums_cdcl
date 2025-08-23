@@ -32,7 +32,8 @@ public:
     void updateJeroslowWang(const Clause& newClause);
 
 
-    int VSIDS();
+    int pickVSIDS();
+    void updateVSIDS();
 };
 
 #endif // HEURISTIC_H

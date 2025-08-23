@@ -43,7 +43,7 @@ int main(int argc, char** argv) {
 
     // --- CLI-Optionen ---
     // Defaults
-    HeuristicType ht = HeuristicType::JEROSLOW_WANG;
+    HeuristicType ht = HeuristicType::VSIDS;
     uint64_t seed = 0; // 0 = kein gefixter seed
     std::string pfad = "../examples/stundenplan.cnf"; // default path
 
@@ -63,6 +63,9 @@ int main(int argc, char** argv) {
         }
         else if (v == "jw" || v == "jeroslow" || v == "jeroslow_wang") {
             ht = HeuristicType::JEROSLOW_WANG;
+        }
+        else if (v == "vsids") {
+            ht = HeuristicType::VSIDS;
         }
     }
 
