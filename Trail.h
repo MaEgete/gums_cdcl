@@ -1,3 +1,16 @@
+/*
+  Trail.h
+  -------
+  Repräsentiert den „Trail“ (Entscheidungspfad) des Solvers.
+  Hier werden alle Zuweisungen von Literalen mit ihrem Entscheidungslevel
+  und ggf. der verantwortlichen Klausel gespeichert.
+
+  Eine Zuweisung (TrailEntry) enthält:
+    - das Literal (Variable + Negation),
+    - den Entscheidunglevel (root = 0),
+    - den Index der Reason-Klausel im Solver (oder -1, falls es eine Entscheidung war).
+*/
+
 #ifndef TRAIL_H
 #define TRAIL_H
 
@@ -8,30 +21,44 @@
 
 class Trail {
 private:
+    // Ein Eintrag im Trail: Literal + Level + Reason
     struct TrailEntry {
-        Literal lit;     // assigned literal
-        int     level;   // decision level
-        int     reason_idx; // index in Solver::clauses; -1 = decision
+        Literal lit;       // zugewiesenes Literal
+        int     level;     // Entscheidungsebene
+        int     reason_idx; // Index der Reason-Klausel im Solver::clauses; -1 = direkte Entscheidung
     };
+
+    // Alle bisherigen Zuweisungen in zeitlicher Reihenfolge
     std::vector<TrailEntry> trail;
 
 public:
-    // Zuweisung pushen
+    // Neues Literal zuweisen und im Trail speichern
     void assign(const Literal& lit, int level, int reason_idx);
 
-    // Abfragen
+    // Prüfen, ob eine Variable schon belegt wurde
     bool isAssigned(int var) const;
-    int  currentLevel() const;
-    Literal& getLastLiteral();
-    int  getLevelOfVar(int var) const;
-    int  getReasonIndexOfVar(int var) const; // -1 wenn Entscheidung / nicht gefunden
 
-    // Alles oberhalb Level entfernen, gibt die entfernten Variablen zurück (zum Unassignen)
+    // Aktuelles Entscheidungslevel (Level des letzten Eintrags oder 0)
+    int  currentLevel() const;
+
+    // Zugriff auf das zuletzt gesetzte Literal
+    Literal& getLastLiteral();
+
+    // Level einer bestimmten Variable zurückgeben (0, falls nicht zugewiesen)
+    int  getLevelOfVar(int var) const;
+
+    // Index der Klausel, die für die Zuweisung verantwortlich war
+    // -1, falls Entscheidung oder nicht vorhanden
+    int  getReasonIndexOfVar(int var) const;
+
+    // Entfernt alle Einträge oberhalb eines Levels (Backtracking)
+    // und gibt die entfernten Variablen zurück
     std::vector<int> popAboveLevel(int level);
 
-    // Read‑only Zugriff (nur zum Iterieren/Debuggen)
+    // Read-only Zugriff auf den kompletten Trail (zum Debuggen oder Iterieren)
     const std::vector<TrailEntry>& getTrail() const;
 
+    // Ausgabeoperator für den Trail (schöne Darstellung)
     friend std::ostream& operator<<(std::ostream& os, const Trail& t);
 };
 

@@ -3,6 +3,9 @@ Weiter Heuristiken implementieren:
 - VSIDS (MiniSat VSIDS / Chaff VSIDS)
 - EVSIDS
 
+
+- BCD (Blocked Clause Decomposition)
+
 - DLIS
 - MOM
 - BOHM
@@ -10,16 +13,3 @@ Weiter Heuristiken implementieren:
 gibts bestimmt noch paar
 
 Und meine eigene natürlich Pair-based
-
-
-
-VSIDS Gedanken:
-
-- Vector von den Scores aller Variablen
-    - Könnte vielleicht nach den Scores sortiert werden (absteigend)
-
-
-- Einen temporäres Set in analyzeConflict, dass alle Variablen sammelt, die am Konfliktprozess beteiligt sind
-  - Werden dann am Ende der Methode mit der learnedClause zurückgegeben
-  - Die Variablen werden dann mit der VSIDS-Heuristik gebumpt und decayed
-    - Und dann dementsprechen in den Vector von den Scores aller Variablen hinzugefügt

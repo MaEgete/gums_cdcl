@@ -1,5 +1,6 @@
 
-
+- Benchmarks:
+    - https://zenodo.org/records/15125952
 
 
 - Weitere Heuristiken (Paper) anschauen:
@@ -24,6 +25,8 @@
         - https://www.cs.utexas.edu/~diz/Sub%20Websites/Research/optimal_speedup_of_las_vegas_algorithms.pdf
     - Predicting Learnt Clauses Quality in Modern SAT Solvers∗ --> (LBD drinnen)
         - https://www.ijcai.org/Proceedings/09/Papers/074.pdf
+    - Improving SAT Solvers via Blocked Clause Decomposition --> (BCD drinnen)
+        - https://arxiv.org/pdf/1604.00536
 
     - Glucose:
         - "Predicting Learnt Clauses Quality in Modern SAT Solver". Gilles Audemard, Laurent Simon, in Twenty-first International Joint Conference on Artificial Intelligence (IJCAI'09), july 2009.

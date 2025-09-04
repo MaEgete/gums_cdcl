@@ -7,7 +7,8 @@
 #include <unordered_set>
 #include <iomanip>
 
-// i >= 1
+// Luby-Folge (i >= 1):
+// Liefert das i-te Element der Luby-Sequenz (für Restart-Budgets).
 int luby(int i) {
     assert(i >= 1);
     int k = 1;
@@ -21,43 +22,59 @@ int luby(int i) {
     return luby(i - (1 << (k -1)) + 1);
 }
 
+// Konstruktor: Größe setzen, Grundstrukturen vorbereiten
 Solver::Solver(int n)
         : numVars(n),
-        assignment(numVars + 1, -1),
-        savedPhase(numVars + 1, -1),
-        activity(numVars + 1, 0.0),
-        pos(numVars + 1, -1)
-    {
-
+          assignment(numVars + 1, -1),   // -1 = unbelegt; Index 0 bleibt ungenutzt
+          savedPhase(numVars + 1, -1)    // -1 = keine gespeicherte Phase
+{
+    // Random-Grundinitialisierung (für Random-Heuristik)
     heuristic.initialize(numVars);
-    //currentHeuristic = HeuristicType::RANDOM;
-    //currentHeuristic = HeuristicType::JEROSLOW_WANG; // JW-TS
-    watchList.assign(2 * numVars, {}); // 2 Einträge je Variable (pos/neg)
+    // VSIDS-Strukturen vorbereiten (Heap/Activity)
+    heuristic.initializeVSIDS(numVars, 0.95);
 
+    // currentHeuristic wird extern gesetzt (setHeuristic)
+    // currentHeuristic = HeuristicType::RANDOM;
+    // currentHeuristic = HeuristicType::JEROSLOW_WANG; // JW-TS
+
+    // Für jedes Literal eine Watch-Liste: pos/neg → 2 pro Variable
+    watchList.assign(2 * numVars, {});
+
+    // Restart-Budget initialisieren (Luby)
     restart_budget = restart_base * luby(restart_idx);
     conflicts_since_restart = 0;
 }
 
+// Hauptschleife des Solvers
 bool Solver::solve() {
-    // Optional: etwas Puffer für gelernte Klauseln
+    // Optional Puffer für gelernte Klauseln (reduziert Reallocs)
     if (!clauses.empty()) clauses.reserve(clauses.size() + 1024);
 
+    // Bestehende Klauseln an Watch-Listen hängen
     attachExistingClauses();
+    // Unit-Klauseln (Level 0) vorab in den Trail
     seedRootUnits();
 
+    // JW-Scores einmalig aus allen Klauseln berechnen (nur wenn JW aktiv)
     if (currentHeuristic == HeuristicType::JEROSLOW_WANG) {
         heuristic.initializeJeroslowWang(clauses, numVars);
     }
 
+    // CDCL-Schleife
     while (true) {
+        // BCP (Two-Watched-Literals)
         Clause* conflict = propagate();
         if (conflict != nullptr) {
-            if (decisionLevel == 0) return false; // UNSAT auf Root-Level
+            // Konflikt auf Root-Level → UNSAT
+            if (decisionLevel == 0) return false;
 
+            // 1-UIP Analyse → (gelernte Klausel, Backjump-Level, assertierendes Literal)
             auto [learnedClause, backjumpLevel, assertLit] = analyzeConflict(conflict);
+
+            // Backjump
             backtrackToLevel(backjumpLevel);
 
-            // LBD berechnen, in Klausel schreiben und Stats updaten
+            // LBD der gelernten Klausel bestimmen + Stats aktualisieren
             const int lbd = learnedClause.computeLBD(trail);
             learnedClause.setLBD(lbd);
             stats.learnt_lbd_sum += static_cast<uint64_t>(lbd);
@@ -66,7 +83,7 @@ bool Solver::solve() {
             else if (lbd <= 4) stats.learnt_lbd_3_4++;
             else               stats.learnt_lbd_ge5++;
 
-            // Reorder: assertierendes Literal an Index 0
+            // Reorder: assertierendes Literal an Position 0 (üblich für BCP)
             {
                 std::vector<Literal> tmp;
                 tmp.reserve(learnedClause.size());
@@ -78,6 +95,7 @@ bool Solver::solve() {
                 learnedClause = Clause(std::move(tmp));
             }
 
+            // Gelernte Klausel hinzufügen (inkl. Watches) + ggf. Datenbank reduzieren
             addClause(learnedClause);
             stats.learnts_added++;
             if ((stats.learnts_added % 200) == 0) {
@@ -85,8 +103,25 @@ bool Solver::solve() {
             }
             int reason_idx = static_cast<int>(clauses.size()) - 1;
 
+            // Assertierendes Literal direkt setzen (am Backjump-Level)
             assign(assertLit, backjumpLevel, reason_idx);
             conflicts_since_restart++;
+
+            // Seltene Statusausgabe (alle 1000 Konflikte)
+            if ((stats.conflicts % 1000) == 0) {
+                double lbd_avg = stats.learnt_lbd_count
+                    ? (double)stats.learnt_lbd_sum / (double)stats.learnt_lbd_count
+                    : 0.0;
+                std::cout << "[conf=" << stats.conflicts
+                          << " restarts=" << stats.restarts
+                          << " learnts=" << stats.learnts_added
+                          << " lbd_avg=" << lbd_avg
+                          << " qhead=" << qhead
+                          << " dl=" << decisionLevel
+                          << "]\n";
+            }
+
+            // Restart nach Budget (Luby)
             if (conflicts_since_restart >= restart_budget) {
                 backtrackToLevel(0);
                 restart_idx++;
@@ -95,38 +130,42 @@ bool Solver::solve() {
                 stats.restarts++;
                 continue;
             }
-            continue; // sofort weiter propagieren
+            continue; // nach Konflikt weiter propagieren
         }
         else if (allVariablesAssigned()) {
-            return true; // SAT
+            // Keine Konflikte und alles belegt → SAT
+            return true;
         }
         else {
+            // Branching-Entscheidung treffen
             Literal decision = pickBranchingVariable();
             decisionLevel++;
-            assign(decision, decisionLevel, -1); // decision (keine Reason)
+            assign(decision, decisionLevel, -1); // -1 = Entscheidung (keine Reason-Klausel)
         }
     }
 }
 
+// Literal (pos/neg) auf Index in watchList abbilden:
+// pos(x) -> (var-1)*2, neg(x) -> (var-1)*2 + 1
 int Solver::litToIndex(const Literal &l) const {
-    // Variablen sind 1..numVars
-    // Indexschema: pos(x) -> (var-1)*2, neg(x) -> (var-1)*2 + 1
     return (l.getVar() - 1) * 2 + (l.isNegated() ? 1 : 0);
 }
 
+// Negation eines Literals bauen
 Literal Solver::negate(const Literal &l) const {
     return Literal(l.getVar(), !l.isNegated());
 }
 
+// Klausel an die Watch-Liste des beobachteten Literals hängen
 void Solver::attachClause(size_t clauseIdx, const Literal &w) {
     watchList[litToIndex(w)].push_back(clauseIdx);
 }
 
+// Klausel aus Watch-Liste lösen (swap-remove)
 void Solver::detachClause(size_t clauseIdx, const Literal &w) {
     auto& v = watchList[litToIndex(w)];
     for (size_t i = 0; i < v.size(); ++i) {
         if (v[i] == clauseIdx) {
-            // swap-remove
             v[i] = v.back();
             v.pop_back();
             return;
@@ -134,6 +173,7 @@ void Solver::detachClause(size_t clauseIdx, const Literal &w) {
     }
 }
 
+// Alte (langsame) Propagation: O(n*m), nur Vergleichszwecke
 Clause* Solver::unitPropagation() {
     bool propagated;
     do {
@@ -145,14 +185,17 @@ Clause* Solver::unitPropagation() {
             int     unsetLits     = 0;
             Literal unassignedLit(0,false);
 
+            // Klausel prüfen: erfüllt? Unit? Konflikt?
             for (const auto& lit : cla.getClause()) {
                 int var = lit.getVar();
                 int val = assignment[var];
 
+                // Literal ist wahr?
                 if ((val == 1 && !lit.isNegated()) || (val == 0 && lit.isNegated())) {
                     satisfied = true;
                     break;
                 }
+                // Unbelegt → potentieller Unit-Kandidat
                 if (val == -1) {
                     ++unsetLits;
                     unassignedLit = lit;
@@ -161,36 +204,43 @@ Clause* Solver::unitPropagation() {
 
             if (satisfied) continue;
             if (unsetLits == 1) {
+                // Unit → zuweisen
                 assign(unassignedLit, decisionLevel, static_cast<int>(i));
                 propagated = true;
             }
             if (unsetLits == 0) {
-                return &cla; // Konflikt
+                // alle falsch → Konflikt
+                return &cla;
             }
         }
     } while (propagated);
     return nullptr;
 }
 
+// Literal in den Trail schreiben, Stats pflegen, Phase speichern
 void Solver::assign(const Literal& lit, int level, int reason_idx) {
-    // Stats: decision vs propagation
+    // Entscheidung vs. Propagation
     if (reason_idx == -1) {
         stats.decisions++;
     } else {
         stats.propagations++;
     }
-    trail.assign(lit, level, reason_idx); // an Trail anhängen (enqueue)
+    // In den Trail (enqueue)
+    trail.assign(lit, level, reason_idx);
+    // Belegung setzen
     assignment[lit.getVar()] = lit.isNegated() ? 0 : 1;
+    // Phase-Saving (0 = neg; 1 = pos)
     savedPhase[lit.getVar()] = lit.isNegated() ? 0 : 1;
 }
 
+// Konfliktanalyse (1-UIP): gelernte Klausel, Backjump-Level, assertierendes Literal
 std::tuple<Clause,int,Literal> Solver::analyzeConflict(const Clause* conflict) {
-    ScopedTimer _t(stats.t_analyze_ms);
-    decayClauseInc(); // one decay per conflict
-    Clause learnedClause = *conflict;
+    ScopedTimer _t(stats.t_analyze_ms);   // Analysezeit messen
+    decayClauseInc(); // pro Konflikt genau einmal das Klausel-Inkrement zerfallen lassen
+    Clause learnedClause = *conflict;     // Start mit Konfliktklausel
 
-    // VSIDS (mVSIDS)
-    std::vector<char> seen_vars(numVars + 1, 0);
+    // Für VSIDS: gemerkte Variablen in dieser Analyse
+    std::vector<uint8_t> seen_vars(numVars + 1, 0);
     std::vector<int> seen_list;
     seen_list.reserve(32);
 
@@ -201,12 +251,14 @@ std::tuple<Clause,int,Literal> Solver::analyzeConflict(const Clause* conflict) {
         }
     };
 
+    // Alle Variablen der Startklausel markieren
     for (const auto& l : learnedClause.getClause()) {
         markSeen(l.getVar());
     }
 
     const int currentLevel = decisionLevel;
 
+    // Zählt, wie viele Literale der Klausel auf einem Level liegen
     auto countAtLevel = [&](int lvl) {
         int c = 0;
         for (const auto& l : learnedClause.getClause()) {
@@ -215,9 +267,9 @@ std::tuple<Clause,int,Literal> Solver::analyzeConflict(const Clause* conflict) {
         return c;
     };
 
-    // Resolve bis 1-UIP: genau 1 Literal aus currentLevel bleibt
+    // Resolve bis 1-UIP erreicht ist (genau 1 Literal auf currentLevel bleibt)
     while (countAtLevel(currentLevel) > 1) {
-        // jüngstes Literal aus currentLevel in learnedClause finden
+        // jüngstes Literal aus currentLevel finden, das in learnedClause vorkommt
         Literal resolveLit(0,false);
         for (auto it = trail.getTrail().rbegin(); it != trail.getTrail().rend(); ++it) {
             if (trail.getLevelOfVar(it->lit.getVar()) != currentLevel) continue;
@@ -228,16 +280,16 @@ std::tuple<Clause,int,Literal> Solver::analyzeConflict(const Clause* conflict) {
             if (inLearned) { resolveLit = it->lit; break; }
         }
 
-        // Reason holen
+        // Reason-Klausel besorgen
         int reason_idx = trail.getReasonIndexOfVar(resolveLit.getVar());
         const Clause* reason = (reason_idx >= 0 && reason_idx < static_cast<int>(clauses.size()))
                              ? &clauses[reason_idx] : nullptr;
         if (!reason) break; // defensiv
-        // bump activity of the reason clause used for resolution
-        if (reason) bumpClauseActivity(*const_cast<Clause*>(reason));
 
+        // Reason-Klausel aktivieren (Clause-Aktivität erhöhen)
+        bumpClauseActivity(*const_cast<Clause*>(reason));
 
-        // VSIDS: alle Variablen aus reason und aktueller learnedClause markieren
+        // VSIDS: Variablen aus Reason + aktueller learnedClause markieren
         for (const auto& l : reason->getClause()) {
             markSeen(l.getVar());
         }
@@ -245,8 +297,7 @@ std::tuple<Clause,int,Literal> Solver::analyzeConflict(const Clause* conflict) {
             markSeen(l.getVar());
         }
 
-
-        // Auflösen über resolveLit
+        // Auflösung über resolveLit
         std::vector<Literal> newLits;
         auto litEquals = [](const Literal& a, const Literal& b){
             return a.getVar() == b.getVar() && a.isNegated() == b.isNegated();
@@ -268,9 +319,13 @@ std::tuple<Clause,int,Literal> Solver::analyzeConflict(const Clause* conflict) {
         learnedClause = Clause(std::move(newLits));
     }
 
-    // bump activity of the learned clause itself
+    // Gelernte Klausel selbst ebenfalls aktivieren (Clause-Activity)
     bumpClauseActivity(learnedClause);
-    // assertierendes Literal = einziges Literal der Klausel auf currentLevel
+
+    // Als gelernt markieren (für Deletion-Policy)
+    learnedClause.setLearnt(true);
+
+    // assertierendes Literal = einziges Literal auf currentLevel
     Literal assertLit(0, false);
     for (const auto& l: learnedClause.getClause()) {
         if (trail.getLevelOfVar(l.getVar()) == currentLevel) {
@@ -279,8 +334,6 @@ std::tuple<Clause,int,Literal> Solver::analyzeConflict(const Clause* conflict) {
         }
     }
 
-
-
     // Backjump-Level = max Level der übrigen Literale (≠ currentLevel)
     int backjumpLevel = 0;
     for (const auto& l : learnedClause.getClause()) {
@@ -288,23 +341,26 @@ std::tuple<Clause,int,Literal> Solver::analyzeConflict(const Clause* conflict) {
         if (lvl != currentLevel) backjumpLevel = std::max(backjumpLevel, lvl);
     }
 
-    // VSIDS: alle gesehenen Variablen bumpen, dann global einmal decayn
+    // VSIDS: alle gesehenen Variablen bumpen; danach globales Decay des varInc
     if (currentHeuristic == HeuristicType::VSIDS) {
         for (int v : seen_list) {
-            vsidsBump(v);
+            heuristic.vsidsBump(v);
         }
-        vsidsDecayInc();
+        heuristic.vsidsDecayInc();
     }
 
     return {learnedClause, backjumpLevel, assertLit};
 }
 
+// Backtrack/Backjump auf gegebenes Level
 void Solver::backtrackToLevel(int level) {
+    // Einträge oberhalb des Levels aus dem Trail entfernen
     auto popped = trail.popAboveLevel(level);
     for (int var : popped) {
-        assignment[var] = -1;
-        if (currentHeuristic == HeuristicType::VSIDS && pos[var] == -1) {
-            heapInsert(var);
+        assignment[var] = -1; // wieder unbelegt
+        // VSIDS: Variable wieder in den Heap aufnehmen
+        if (currentHeuristic == HeuristicType::VSIDS) {
+            heuristic.onBacktrackUnassign(var);
         }
     }
 
@@ -316,14 +372,17 @@ void Solver::backtrackToLevel(int level) {
     }
 }
 
+// Watch-Listen für bereits existierende Klauseln aufbauen
 void Solver::attachExistingClauses() {
     for (size_t idx = 0; idx < clauses.size(); ++idx){
         auto& c = clauses[idx];
+        // Default-Watches setzen, falls noch nicht initialisiert
         if (c.size() > 0 && (c.watch0() == -1 || c.watch1() == -1)) {
             c.initWatchesDefault();
         }
+        // An die entsprechenden Watch-Listen hängen
         if (c.size() == 1) {
-            attachClause(idx, c.at(0)); // nur einmal attachen
+            attachClause(idx, c.at(0)); // Unit: nur einmal attachen
         } else {
             if (c.watch0() != -1) attachClause(idx, c.at(c.watch0()));
             if (c.watch1() != -1) attachClause(idx, c.at(c.watch1()));
@@ -331,25 +390,45 @@ void Solver::attachExistingClauses() {
     }
 }
 
+// Branching-Variable wählen (abhängig von der Heuristik)
 Literal Solver::pickBranchingVariable() {
-    int  var        = -1;
-    bool useNegated = false;
-    bool jwNegHint  = false; // nur als Fallback, falls noch keine Phase gespeichert
+    int  var        = -1;   // gewählte Variable
+    bool useNegated = false; // gewählte Polarität (true = negiert)
+    bool jwNegHint  = false; // JW-Empfehlung, nur wenn keine Phase gespeichert
 
     switch (currentHeuristic) {
         case HeuristicType::RANDOM: {
+            // Random: unbelegte Variablen neu bestimmen und zufällig wählen
             heuristic.update(trail, numVars);
             var = heuristic.pickRandomVar();
             break;
         }
         case HeuristicType::JEROSLOW_WANG: {
+            // JW: beste Variable + empfohlene Polarität
             auto [v, neg] = heuristic.pickJeroslowWangVar(assignment);
             var = v;
             jwNegHint = neg;      // nur nutzen, wenn savedPhase[var] noch unbekannt ist
             break;
         }
         case HeuristicType::VSIDS: {
-            var = vsidsPickVar();
+            // VSIDS: Spitze des Heaps suchen, aber belegte Variablen überspringen
+            int candidate = -1;
+            while (true) {
+                int top = heuristic.heapTop();
+                if (top == -1) { // leerer Heap – sollte selten sein
+                    candidate = -1;
+                    break;
+                }
+                if (assignment[top] != -1) {
+                    // Belegte Spitze verwerfen und weitersuchen
+                    heuristic.heapPop();
+                    continue;
+                }
+                // Unbelegte Spitze gefunden – NICHT poppen (entspricht altem Verhalten)
+                candidate = top;
+                break;
+            }
+            var = candidate;
             break;
         }
         default: {
@@ -357,7 +436,7 @@ Literal Solver::pickBranchingVariable() {
         }
     }
 
-    // Guard/Fallback: erste unbelegte Variable suchen
+    // Sicherheits-Fallback: erste unbelegte Variable nehmen
     if (var <= 0 || var > numVars || assignment[var] != -1) {
         var = -1;
         for (int v = 1; v <= numVars; ++v) {
@@ -366,9 +445,9 @@ Literal Solver::pickBranchingVariable() {
         if (var == -1) var = 1;
     }
 
-    // Polarity-Regel:
-    // - Wenn Phase-Saving schon eine Phase kennt, nutze die (fair & stabil).
-    // - Sonst (nur beim ersten Mal) nimm die JW-Empfehlung.
+    // Polarität:
+    // - Wenn Phase-Saving etwas kennt, nutze das (stabil, fair).
+    // - Sonst (nur beim ersten Mal) die JW-Empfehlung übernehmen.
     if (savedPhase[var] != -1) {
         useNegated = (savedPhase[var] == 0);   // 0 == zuletzt NEGATIV
     } else {
@@ -378,24 +457,29 @@ Literal Solver::pickBranchingVariable() {
     return Literal{var, useNegated};
 }
 
+// Heuristik umschalten
 void Solver::setHeuristic(HeuristicType type) {
     currentHeuristic = type;
 }
 
+// Prüfen, ob alle Variablen belegt sind
 bool Solver::allVariablesAssigned() const {
     for (int i = 1; i <= numVars; ++i)
         if (assignment[i] == -1) return false;
     return true;
 }
 
+// Klausel hinzufügen (inkl. Watches) + ggf. JW-Update + LBD nachtragen
 void Solver::addClause(const Clause& clause) {
     clauses.push_back(clause);
     size_t idx = clauses.size() - 1;
     Clause& c = clauses[idx];
 
+    // Watches setzen, wenn nötig
     if (c.size() > 0 && (c.watch0() == -1 || c.watch1() == -1))
         c.initWatchesDefault();
 
+    // An die Watch-Listen hängen
     if (c.size() == 1) {
         attachClause(idx, c.at(0));
     } else {
@@ -403,15 +487,18 @@ void Solver::addClause(const Clause& clause) {
         if (c.watch1() != -1) attachClause(idx, c.at(c.watch1()));
     }
 
+    // LBD nachtragen, falls noch nicht gesetzt (z. B. bei Input-Klauseln)
     if (c.getLBD() < 0) {
         c.setLBD(c.computeLBD(trail));
     }
 
+    // JW-Scores inkrementell aktualisieren (nur wenn JW aktiv)
     if (currentHeuristic == HeuristicType::JEROSLOW_WANG) {
         heuristic.updateJeroslowWang(c);
     }
 }
 
+// Modell ausgeben (Debug/Info)
 void Solver::printModel() const {
     for (int i = 1; i <= numVars; ++i) {
         std::cout << "x" << i << " = "
@@ -420,6 +507,7 @@ void Solver::printModel() const {
     }
 }
 
+// Statistiken ausgeben
 void Solver::printStats() const {
     std::cout << "\n========== Solver Statistics ==========\n";
     std::cout << std::left << std::setw(20) << "Decisions:"       << stats.decisions << "\n";
@@ -441,6 +529,7 @@ void Solver::printStats() const {
     std::cout << "=======================================\n\n";
 }
 
+// Heuristik-Namen für die Statistik
 std::string Solver::heuristicToString(HeuristicType type) {
     switch (type) {
         case HeuristicType::JEROSLOW_WANG:
@@ -456,6 +545,8 @@ std::string Solver::heuristicToString(HeuristicType type) {
     return "None";
 }
 
+// Watch-Verarbeitung für ein falsifiziertes Literal:
+// versuche Watch umzuhängen; sonst Unit/Conflict
 Clause* Solver::propagateLiteralFalse(const Literal &falsified) {
     // Nur Klauseln betrachten, die das aktuell falsifizierte Literal beobachten
     auto& wl = watchList[litToIndex(falsified)];
@@ -473,24 +564,24 @@ Clause* Solver::propagateLiteralFalse(const Literal &falsified) {
         if (w0 != -1 && C->at(w0) == falsified) wIdx = 0;
         else if (w1 != -1 && C->at(w1) == falsified) wIdx = 1;
 
-        // Sicherheitsabfrage
+        // Sicherheitsabfrage (sollte selten passieren)
         if (wIdx == -1) { ++i; continue; }
 
-        // otherIdx aus w0/w1 ermitteln
+        // Index des anderen Watches
         const int otherIdx = (wIdx == 0 ? w1 : w0);
 
         const Literal& other = C->at(otherIdx);
 
-        // Wenn der andere Watch schon wahr ist -> Klausel erfüllt
+        // Wenn der andere Watch bereits wahr ist → Klausel erfüllt
         if (assignment[other.getVar()] != -1) {
             const bool val = (assignment[other.getVar()] == 1);
-            if (val != other.isNegated()) { ++i; continue; } // literal true
+            if (val != other.isNegated()) { ++i; continue; } // Literal ist wahr
         }
 
         // Versuche, Watch auf ein anderes nicht-falsches Literal zu verschieben
         bool moved = false;
         for (size_t k = 0; k < C->size(); ++k) {
-            if ((int)k == w0 || (int)k == w1) continue;
+            if ((int)k == w0 || (int)k == w1) continue; // andere Literale als die beiden Watches
             const Literal& cand = C->at(k);
 
             // cand ist nicht-falsch? (unassigned oder wahr)
@@ -498,7 +589,7 @@ Clause* Solver::propagateLiteralFalse(const Literal &falsified) {
             bool candFalse = (a != -1) && ( (a==1) == cand.isNegated() );
 
             if (!candFalse) {
-                // Watch von "falsified" -> "cand" umhängen
+                // Watch von "falsified" → "cand" umhängen
                 wl[i] = wl.back(); // swap-remove aus dieser Watchliste
                 wl.pop_back();
                 attachClause(cidx, cand); // in die neue Watchliste einhängen
@@ -510,16 +601,16 @@ Clause* Solver::propagateLiteralFalse(const Literal &falsified) {
         }
 
         if (moved) {
-            // Wichtig: wl[i] hat sich via detach/attach verändert → an Stelle i steht ein neues Element
-            continue; // i NICHT erhöhen
+            // Achtung: wl[i] wurde durch swap-remove ersetzt → nicht i++ !
+            continue;
         }
 
-        // Kein Ersatz gefunden -> Unit oder Konflikt
+        // Kein Ersatz gefunden → Unit oder Konflikt
         int a = assignment[other.getVar()];
         bool otherFalse = (a != -1) && ( (a==1) == other.isNegated() );
 
         if (otherFalse) {
-            // beide Watches falsifiziert -> Konflikt
+            // Beide Watches falsifiziert → Konflikt
             return C;
         } else {
             // Unit: setze "other" mit Reason = Index dieser Klausel
@@ -530,9 +621,10 @@ Clause* Solver::propagateLiteralFalse(const Literal &falsified) {
     return nullptr;
 }
 
+// Neue (schnelle) Propagation via Two-Watched-Literals
 Clause *Solver::propagate() {
 
-    ScopedTimer _t(stats.t_bcp_ms);
+    ScopedTimer _t(stats.t_bcp_ms); // Zeit für BCP messen
 
     // Verarbeite alle neuen Trail-Einträge ab qhead
     const auto& tr = trail.getTrail();
@@ -540,7 +632,7 @@ Clause *Solver::propagate() {
         Literal p = tr[qhead].lit; // nächstes unpropagiertes Literal
         ++qhead;
 
-        // p == true -> ¬p ist falsifiziert: nur diese Watch-Liste bearbeiten
+        // p == true → ¬p ist falsifiziert: nur diese Watch-Liste abarbeiten
         Clause* confl = propagateLiteralFalse(negate(p));
         if (confl) {
             stats.conflicts++;
@@ -550,6 +642,7 @@ Clause *Solver::propagate() {
     return nullptr;
 }
 
+// Alle Unit-Klauseln auf Level 0 in den Trail legen
 void Solver::seedRootUnits() {
     for (size_t i = 0; i < clauses.size(); ++i) {
         Clause& c = clauses[i];
@@ -563,12 +656,14 @@ void Solver::seedRootUnits() {
     }
 }
 
+// Klausel-Datenbank reduzieren (Glucose-Style Heuristik)
 void Solver::reduceDB() {
     // --- Kandidaten sammeln: keine Units/Binaries, LBD>2, nicht locked ---
     struct Candidate { size_t idx; int lbd; size_t sz; double act; };
     std::vector<Candidate> cand;
     cand.reserve(clauses.size());
 
+    // "locked" = dient aktuell als Reason auf dem Trail → behalten
     auto isLocked = [&](size_t cidx) -> bool {
         for (const auto& e : trail.getTrail()) {
             if (e.reason_idx == static_cast<int>(cidx)) return true;
@@ -576,8 +671,10 @@ void Solver::reduceDB() {
         return false;
     };
 
+    // Auswahl der zu prüfenden gelernten Klauseln
     for (size_t i = 0; i < clauses.size(); ++i) {
         Clause& c = clauses[i];
+        if (!c.isLearnt()) continue;        // Eingabeklauseln nie löschen
         const size_t sz = c.size();
         if (sz <= 2) continue;              // Units/Binaries behalten
         const int lbd = c.getLBD();
@@ -588,13 +685,15 @@ void Solver::reduceDB() {
 
     if (cand.size() < 2) return;
 
-    // Schlechteste zuerst: hohe LBD, dann niedrige Aktivität, dann längere Klausel
+    // Sortierung "schlechteste zuerst":
+    //  1) höhere LBD
+    //  2) niedrigere Aktivität
+    //  3) längere Klausel
     std::sort(cand.begin(), cand.end(), [](const Candidate& a, const Candidate& b){
         if (a.lbd != b.lbd) return a.lbd > b.lbd;   // higher LBD is worse
         if (a.act != b.act) return a.act < b.act;   // lower activity is worse
         return a.sz  > b.sz;                        // larger clauses are worse
     });
-
 
     // Ungefähr die Hälfte der Kandidaten löschen
     size_t toRemove = cand.size() / 2;
@@ -642,10 +741,12 @@ void Solver::reduceDB() {
     }
 }
 
+// Seed für Random-Heuristik weiterreichen
 void Solver::setHeuristicSeed(uint64_t s) {
     heuristic.setSeed(s);
 }
 
+// Aktivität einer Klausel erhöhen + Rescale-Schutz
 void Solver::bumpClauseActivity(Clause &c) {
     c.bumpActivity(clauseInc);
     if (c.getActivity() > 1e100) { // Re-scale
@@ -656,102 +757,7 @@ void Solver::bumpClauseActivity(Clause &c) {
     }
 }
 
+// Zerfall des Klausel-Inkrements (wie bei VSIDS varInc)
 void Solver::decayClauseInc() {
     clauseInc /= clauseDecay;
-}
-
-void Solver::vsidsBump(int v) {
-    activity[v] += var_inc;
-    if (activity[v] > 1e100) {
-        for (int u = 1; u <= numVars; ++u) {
-            activity[u] *= 1e-100;
-        }
-        var_inc *= 1e-100;
-    }
-    if (pos[v] != -1) {
-        heapIncreaseKey(v);
-    }
-    else if (assignment[v] == -1) {
-        heapInsert(v);
-    }
-}
-
-void Solver::vsidsDecayInc() {
-    var_inc /= var_decay;
-}
-
-int Solver::vsidsPickVar() {
-    while (!heap.empty()) {
-        int v = heapTop();
-        if (assignment[v] == -1) { // nur gültig, wenn unassigned
-            return v;
-        }
-        heapPop(); // ungültig: schon assigned
-    }
-    return -1;
-}
-
-int Solver::heapTop() {
-    return heap.empty() ? -1 : heap[0];
-}
-
-void Solver::heapPop() {
-    int v = heap[0];
-    int last = heap.back();
-    heap.pop_back();
-    pos[v] = -1;
-
-    if (!heap.empty()) {
-        heap[0] = last;
-        pos[last] = 0;
-        heapifyDown(0);
-    }
-}
-
-void Solver::heapifyUp(int i) {
-    while (i > 0) {
-        int parent = (i - 1) / 2;
-        if (activity[heap[parent]] >= activity[heap[i]]) {
-            break;
-        }
-        std::swap(heap[parent], heap[i]);
-        pos[heap[parent]] = parent;
-        pos[heap[i]] = i;
-        i = parent;
-    }
-}
-
-void Solver::heapifyDown(int i) {
-    int n = heap.size();
-    while (true) {
-        int left = 2*i + 1;
-        int right = 2*i + 2;
-        int largest = i;
-
-        if (left < n && activity[heap[left]] > activity[heap[largest]]) {
-            largest = left;
-        }
-        if (right < n && activity[heap[right]] > activity[heap[largest]]) {
-            largest = right;
-        }
-
-        if (largest == i) break;
-
-        std::swap(heap[i], heap[largest]);
-        pos[heap[i]] = i;
-        pos[heap[largest]] = largest;
-        i = largest;
-    }
-}
-
-void Solver::heapInsert(int v) {
-    heap.push_back(v);
-    int i = heap.size() -1;
-    pos[v] = i;
-    heapifyUp(i);
-}
-
-void Solver::heapIncreaseKey(int v) {
-    int i = pos[v];
-    heapifyUp(i);
 }

@@ -6,148 +6,139 @@
 #include "Trail.h"
 #include "Heuristic.h"
 
-struct Stats {
-    uint64_t decisions=0, conflicts=0, propagations=0;
-    uint64_t learnts_added=0, restarts=0;
-    uint64_t clause_inspections=0, watch_moves=0;
-    uint64_t t_bcp_ms=0, t_analyze_ms=0;
+//
+// Solver.h
+// ---------
+// Deklaration des CDCL-Solvers:
+//  - verwaltet Klauseln, Trail, Heuristiken und Restart/Deletion-Strategien
+//  - implementiert Unit-Propagation (Two-Watched-Literals), Konfliktanalyse,
+//    Backtracking/Backjumping, Restart-Luby, Clause-Deletion (Glucose-Style)
+//  - stellt Statistiken bereit
+//
 
-    // --- LBD statistics ---
+struct Stats {
+    // Zählwerte
+    uint64_t decisions=0, conflicts=0, propagations=0;  // Entscheidungen, Konflikte, Propagationseinträge
+    uint64_t learnts_added=0, restarts=0;               // #gelernter Klauseln, #Restarts
+    uint64_t clause_inspections=0, watch_moves=0;       // #besuchte Klauseln, #Watch-Verschiebungen
+    uint64_t t_bcp_ms=0, t_analyze_ms=0;                // Zeiten (ms) für BCP und Analyse
+
+    // LBD-Statistiken (Qualität gelernter Klauseln)
     uint64_t learnt_lbd_sum   = 0;  // Summe der LBDs gelernter Klauseln
     uint64_t learnt_lbd_count = 0;  // Anzahl gelernter Klauseln (für die LBD berechnet wurde)
     uint64_t learnt_lbd_le2   = 0;  // #gelernter Klauseln mit LBD <= 2
     uint64_t learnt_lbd_3_4   = 0;  // #gelernter Klauseln mit LBD in {3,4}
     uint64_t learnt_lbd_ge5   = 0;  // #gelernter Klauseln mit LBD >= 5
 
+    // Deletion-Statistiken
     uint64_t deleted_count    = 0;  // #gelöschter Klauseln in reduceDB
     uint64_t deleted_lbd_sum  = 0;  // Summe der LBDs gelöschter Klauseln
 };
 
+// verfügbare Variablenwahl-Heuristiken
 enum class HeuristicType {
-    RANDOM,
-    JEROSLOW_WANG,
-    VSIDS,
+    RANDOM,         // zufällige Wahl einer unbelegten Variable
+    JEROSLOW_WANG,  // Jeroslow-Wang (gewichtete Literal-Scores)
+    VSIDS,          // (E)VSIDS: Aktivitäten + Heap
 };
-
-
 
 class Solver {
 private:
 
-    // Statistiken
+    // Laufzeit- und Qualitätsstatistiken
     Stats stats;
 
-    int numVars;
-    // Für jedes Literal (inkl. Negation) eine Liste beobachtender Klauseln (Indices)
-    std::vector<std::vector<size_t>> watchList;
+    int numVars;                                               // Anzahl Variablen
+    std::vector<std::vector<size_t>> watchList;                // pro Literal: Liste beobachtender Klausel-Indizes
 
-    size_t qhead = 0; // Index ins Trail: bis wohin wurde propagiert?
+    size_t qhead = 0; // Index in den Trail: bis wohin wurde bereits propagiert?
 
-    int     litToIndex(const Literal& l) const; // mappe Literal -> [0 .. 2*numVars-1]
-    Literal negate(const Literal& l) const;
+    // Hilfsfunktionen für Literale
+    int     litToIndex(const Literal& l) const; // Literal → [0 .. 2*numVars-1] (pos/neg)
+    Literal negate(const Literal& l) const;      // ¬Literal
 
-    // Klausel an das Literal attachen, welches die Klausel gerade beobachtet
-    void    attachClause(size_t clauseIdx, const Literal& w);
-    // Klausel detachen, wenn die Klausel das Literal nicht mehr beobachtet
-    void    detachClause(size_t clauseIdx, const Literal& w);
+    // Watch-Listen pflegen
+    void attachClause(size_t clauseIdx, const Literal& w); // Klausel an Watch-Liste des Literals hängen
+    void detachClause(size_t clauseIdx, const Literal& w); // Klausel aus Watch-Liste lösen
 
-    // Unit Propagation für 2-Watched-Literals
+    // Propagation (Two-Watched-Literals): bearbeite die Watch-Liste des falsifizierten Literals
     Clause* propagateLiteralFalse(const Literal& falsified);
 
-    std::vector<Clause> clauses;
-    Trail               trail;
-    int                 decisionLevel = 0;
-    Heuristic           heuristic;
-    HeuristicType       currentHeuristic;
+    // Kern-Datenstrukturen
+    std::vector<Clause> clauses;  // alle (auch gelernte) Klauseln
+    Trail               trail;    // Zuweisungsverlauf (Literal, Level, Reason)
+    int                 decisionLevel = 0; // aktuelles Entscheidungslevel (root = 0)
+    Heuristic           heuristic;        // Heuristik-Objekt (Random/JW/VSIDS)
+    HeuristicType       currentHeuristic; // aktuell gewählte Heuristik
 
-    // assignment[i] = -1 (unbelegt), 0 (false), 1 (true), Index 0 ignorieren
+    // Belegungen: assignment[i] = -1 (unbelegt), 0 (false), 1 (true); Index 0 unbenutzt
     std::vector<int> assignment;
 
-    // -1 = unknown, 0 = prefer false (negated), 1 = prefer true (non-negated)
+    // Phase Saving: -1 = unbekannt, 0 = prefer false (negated), 1 = prefer true (non-negated)
     std::vector<int> savedPhase;
 
-    // --- Luby ---
-    int restart_idx = 1;
-    int restart_base = 2;
-    int conflicts_since_restart = 0;
-    int restart_budget = 0;
+    // Restart (Luby-Folge)
+    int restart_idx = 1;                 // Index in der Luby-Folge
+    int restart_base = 2;                // Basis-Multiplikator
+    int conflicts_since_restart = 0;     // seit letztem Restart gezählte Konflikte
+    int restart_budget = 0;              // Konfliktbudget bis zum nächsten Restart
 
-    // -- Deletion-Policy Glucose-Style ---
-    double clauseInc = 1.0;         // Start-Inkrement für Klauseln
-    double clauseDecay = 0.95;     // Decay für Klauseln
-
-    // -- Activities für VSIDS --
-    std::vector<double> activity;   // Score jeder Variable (Index = Variablen-ID)
-    std::vector<int> heap;          // MaxHeap (Ordnung basiert auf activity[v] (absteigend))
-    std::vector<int> pos;           // Speichert, an welcher Position im Heap eine Variable liegt (-1 falls nicht im Heap)
-    double var_inc = 1.0;           // Start-Inkrement für Variablen
-    double var_decay = 0.95;       // Decay für Variablen
-
+    // Deletion-Policy (Glucose-Style): Aktivitätsskala der Klauseln
+    double clauseInc = 1.0;   // Start-Inkrement
+    double clauseDecay = 0.95;// Zerfallsfaktor für clauseInc
 
 public:
+    // Konstruktor: setzt Größe, initialisiert Heuristik/Strukturen
     explicit Solver(int n);
 
+    // Hauptschleife des Solvers (liefert SAT/UNSAT)
     bool     solve();
-    Clause*  unitPropagation(); // alte O(n*m)-Variante (optional)
 
+    // Optionale alte Propagation O(n*m) (nur zu Vergleichszwecken)
+    Clause*  unitPropagation();
+
+    // Zuweisung eines Literals (Decision/Propagation) am aktuellen Level
     void assign(const Literal& lit, int level, int reason_idx);
+
+    // Konfliktanalyse: liefert (gelernte Klausel, Backjump-Level, assertierendes Literal)
     std::tuple<Clause,int,Literal> analyzeConflict(const Clause* conflict);
 
+    // Backjump/Backtrack auf ein bestimmtes Level
     void    backtrackToLevel(int level);
+
+    // Branching-Entscheidung treffen (gemäß aktueller Heuristik)
     Literal pickBranchingVariable();
 
+    // Heuristik wählen
     void setHeuristic(HeuristicType type);
 
-    bool allVariablesAssigned() const;
-    void addClause(const Clause& clause);
-    void printModel() const;
-    void printStats() const;
+    // Status/IO
+    bool allVariablesAssigned() const; // true, wenn alle Variablen belegt sind
+    void addClause(const Clause& clause); // Klausel hinzufügen (inkl. Watches setzen)
+    void printModel() const;              // Belegung ausgeben
+    void printStats() const;              // Statistiken ausgeben
 
-    Clause* propagate();             // neue Propagation mit 2WL
-    void    attachExistingClauses(); // falls Clauses schon im Vektor sind
-    void    seedRootUnits();         // root-level Units vorab enqueuen
+    // Neue, effiziente Propagation (Two-Watched-Literals)
+    Clause* propagate();
 
-    // Deletion-Policy
+    // Bestehende Klauseln an Watch-Listen hängen (falls bereits im Vektor)
+    void    attachExistingClauses();
+
+    // Root-Level Units vorab enqueuen (Level 0)
+    void    seedRootUnits();
+
+    // Deletion-Policy: Schwache gelernte Klauseln entfernen
     void reduceDB();
 
-    // Seed für die Random-Heuristik setzen
+    // Seed für Random-Heuristik setzen
     void setHeuristicSeed(uint64_t s);
 
-    // Activity der Klausel inkrementieren
+    // Klauselaktivität erhöhen / Inkrement zerfallen lassen
     void bumpClauseActivity(Clause& c);
-    // Zerfall der Activity der Klauseln
     void decayClauseInc();
 
-    // Ausgabe für Stats
+    // Heuristik-Name als String (für Ausgabe)
     static std::string heuristicToString(HeuristicType type);
-
-    // Activity der Variabel inkrementieren
-    void vsidsBump(int v);
-
-    // Zerfall der Activity der Variablen
-    void vsidsDecayInc();
-
-    // Auswahl der Variable
-    int vsidsPickVar();
-
-    // Rückgabe des ersten Elements auf dem Heap
-    int heapTop();
-
-    // Entfernen des ersten Elements auf dem Heap
-    void heapPop();
-
-    // Neues / geupdatetetes Element richtig nach oben in die Liste setzen (Binärbaum)
-    void heapifyUp(int i);
-
-    // Neues / geupdatetetes Element richtig nach unten in die Liste setzen (Binärbaum)
-    void heapifyDown(int i);
-
-    // In den Heap einfügen
-    void heapInsert(int v);
-
-    // Heap updaten
-    void heapIncreaseKey(int v);
-
 };
 
 #endif // SOLVER_H

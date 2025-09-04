@@ -1,6 +1,21 @@
-//
-// Created by Martin Egetemeyer on 15.08.25.
-//
+/*
+Timer.h
+  -------
+  Dieses kleine Hilfs-Struct ermöglicht es, die Laufzeit eines Code-Blocks
+  automatisch zu messen und aufzusummieren.
+
+  Verwendung:
+    {
+        ScopedTimer t(stats.t_bcp_ms);
+        ... // Code, dessen Zeit gemessen werden soll
+    }
+  → Beim Erzeugen wird die Startzeit gespeichert,
+    beim Verlassen des Blocks (Destruktor) wird die Differenz in Millisekunden
+    zur übergebenen Variable (acc) addiert.
+
+  So kann man einfach kumulierte Zeiten für verschiedene Solver-Teile erfassen
+  (z. B. BCP, Analyse).
+*/
 
 #ifndef CDCL_SOLVER_TIMER_H
 #define CDCL_SOLVER_TIMER_H
@@ -8,11 +23,18 @@
 #include <chrono>
 #include <cstdint>
 
+// Misst die Zeitspanne zwischen Konstruktor- und Destruktoraufruf
+// und addiert sie zu einer Referenzvariablen.
 struct ScopedTimer {
-    uint64_t& acc;
-    const std::chrono::steady_clock::time_point t0;
+    uint64_t& acc; // Zielvariable, in die die gemessene Zeit addiert wird
+    const std::chrono::steady_clock::time_point t0; // Startzeit
+
+    // Konstruktor: startet den Timer und merkt sich Referenz auf die Zielvariable
     explicit ScopedTimer(uint64_t& a)
         : acc(a), t0(std::chrono::steady_clock::now()) {}
+
+    // Destruktor: wird beim Verlassen des Scopes aufgerufen,
+    // berechnet die verstrichene Zeit in Millisekunden und addiert sie zu acc.
     ~ScopedTimer() noexcept {
         acc += static_cast<uint64_t>(
             std::chrono::duration_cast<std::chrono::milliseconds>(
@@ -22,5 +44,4 @@ struct ScopedTimer {
     }
 };
 
-
-#endif //CDCL_SOLVER_TIMER_H
+#endif // CDCL_SOLVER_TIMER_H
