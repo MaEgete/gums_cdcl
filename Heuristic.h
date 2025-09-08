@@ -1,15 +1,4 @@
-/*
-  Heuristic.h
-  -----------
-  Bündelt alle Heuristiken zur Variablenwahl für den CDCL-Solver:
-    - Random
-    - Jeroslow-Wang (getrennte pos/neg-Scores)
-    - VSIDS (Aktivitäten + Max-Heap)
 
-  Ziel:
-    - Solver bleibt frei von Heuristikdetails.
-    - Gemeinsame Schnittstelle, sodass Heuristiken leicht austauschbar sind.
-*/
 
 #ifndef HEURISTIC_H
 #define HEURISTIC_H

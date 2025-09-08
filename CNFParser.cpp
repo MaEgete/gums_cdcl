@@ -78,7 +78,7 @@ bool CNFParser::readFile() {
     }
 
     // Dateiende erreicht:
-    // Falls die letzte Klausel NICHT mit 0 abgeschlossen wurde, verwerfen wir sie (optional warnen).
+    // Falls die letzte Klausel NICHT mit 0 abgeschlossen wurde, verwerfen wir sie (optional warnen)
     if (!current.empty()) {
         std::cerr << "Warnung: Letzte Klausel endete nicht mit 0 und wurde ignoriert.\n";
         current.clear();

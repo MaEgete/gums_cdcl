@@ -6,15 +6,6 @@
 #include "Trail.h"
 #include "Heuristic.h"
 
-//
-// Solver.h
-// ---------
-// Deklaration des CDCL-Solvers:
-//  - verwaltet Klauseln, Trail, Heuristiken und Restart/Deletion-Strategien
-//  - implementiert Unit-Propagation (Two-Watched-Literals), Konfliktanalyse,
-//    Backtracking/Backjumping, Restart-Luby, Clause-Deletion (Glucose-Style)
-//  - stellt Statistiken bereit
-//
 
 struct Stats {
     // Zählwerte

@@ -1,3 +1,22 @@
+Code verstehen:
+
+Fertig:
+Literal
+Clause
+Trail
+Timer
+CNFParser
+main
+
+
+
+Unfertig:
+Heuristic
+Solver
+
+
+
+
 Weiter Heuristiken implementieren:
 
 - VSIDS (MiniSat VSIDS / Chaff VSIDS)

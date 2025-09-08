@@ -1,12 +1,3 @@
-/*
-Literal.cpp
-  -----------
-  Implementierung der Klasse Literal.
-  Ein Literal besteht aus einer Variablen-ID und einem Negations-Flag.
-  Beispiele:
-    - x3  (Variable 3 positiv)
-    - ¬x3 (Variable 3 negiert)
-*/
 
 #include "Literal.h"
 
@@ -24,8 +15,8 @@ bool Literal::isNegated() const {
 }
 
 // Gibt eine Ganzzahl-Repräsentation zurück:
-//   - positiv für nicht-negierte Variablen (x3 → 3)
-//   - negativ für negierte Variablen (¬x3 → -3)
+//   - positiv für nicht-negierte Variablen (x3 -> 3)
+//   - negativ für negierte Variablen (¬x3 -> -3)
 int Literal::toInt() const {
     return negated ? -var : var;
 }

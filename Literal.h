@@ -1,12 +1,4 @@
-/*
-Literal.h
-  ---------
-  Repräsentiert ein Literal im SAT-Solver.
-  Ein Literal ist eine Variable (ID >= 1) mit möglicher Negation.
-  Beispiel:
-    - x3  (Variable 3 positiv)
-    - ¬x3 (Variable 3 negiert)
-*/
+
 
 #ifndef LITERAL_H
 #define LITERAL_H
@@ -20,7 +12,7 @@ private:
 
 public:
     // Konstruktor: v = Variablen-ID, neg = Negations-Flag
-    Literal(const int v = 0, const bool neg = false);
+    Literal(int v = 0, bool neg = false);
 
     // Gibt die Variablen-ID zurück
     int  getVar() const;
@@ -29,7 +21,7 @@ public:
     bool isNegated() const;
 
     // Gibt die Ganzzahl-Repräsentation zurück:
-    // positiv für nicht-negiert (x3 → 3), negativ für negiert (¬x3 → -3)
+    // positiv für nicht-negiert (x3 -> 3), negativ für negiert (¬x3 -> -3)
     int toInt() const;
 
     // Ausgabe als String ("x3" oder "¬x3")

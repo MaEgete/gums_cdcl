@@ -1,20 +1,4 @@
-/*
-  main.cpp
-  --------
-  Startpunkt des CDCL-SAT-Solvers "Gums".
-  Aufgaben dieses Programms:
-    - CLI-Argumente lesen (--cnf, --heuristic, --seed)
-    - CNF-Datei einlesen und Klauseln/Variablen bereitstellen
-    - Solver anlegen, Heuristik setzen, Klauseln hinzufügen
-    - solve() starten und Ergebnis + Statistiken + Laufzeiten ausgeben
 
-  Hinweise zur Benutzung:
-    --cnf=PFAD           Pfad zur DIMACS-CNF-Datei
-    --heuristic=...      random | jw | vsids
-    --seed=ZAHL          Seed für Random-Heuristik (0 = kein fester Seed)
-
-  Nichts an der Logik wurde verändert, nur Kommentare ergänzt.
-*/
 
 #include <iostream>
 #include <vector>
@@ -29,8 +13,8 @@
 #include "CNFParser.h"
 #include "Solver.h"
 
-// Kleine Hilfsfunktion: holt den Wert zu einem Schlüssel aus den CLI-Argumenten.
-// Funktioniert sowohl für Formen wie "--key=value" als auch "--keyvalue" (falls so übergeben).
+// Kleine Hilfsfunktion: holt den Wert zu einem Schlüssel aus den CLI-Argumenten
+// Funktioniert sowohl für Formen wie "--key=value" als auch "--keyvalue" (falls so übergeben)
 static std::optional<std::string> getArgValue(int argc, char** argv, const char* key) {
     const std::string prefix = std::string(key) + "=";
     for (int i = 1; i < argc; ++i) {

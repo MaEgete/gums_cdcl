@@ -1,14 +1,4 @@
-/*
-CNFParser.h
-  -----------
-  Liest eine CNF-Datei im DIMACS-Format ein und wandelt diese in Klauseln um,
-  die der Solver weiterverarbeiten kann.
 
-  Aufgaben:
-    - Pfad zur Datei speichern
-    - Datei einlesen und Parsen (DIMACS-Standard: Kommentare, Header, Klauseln)
-    - Zugriff auf Klauseln und Anzahl der Variablen ermöglichen
-*/
 
 #ifndef CNFPARSER_H
 #define CNFPARSER_H

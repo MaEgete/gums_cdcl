@@ -10,16 +10,20 @@
 // Luby-Folge (i >= 1):
 // Liefert das i-te Element der Luby-Sequenz (für Restart-Budgets).
 int luby(int i) {
-    assert(i >= 1);
     int k = 1;
-    // Finde k mit 2^k - 1 >= i
-    while (((1 << k) - 1) < i) ++k;
+    while (true) {
+        int two_k     = static_cast<int>(std::pow(2, k));
+        int bound     = two_k - 1;
+        int prevBound = static_cast<int>(std::pow(2, k - 1));
 
-    if (((1 << k) - 1) == i) {
-        return 1 << (k - 1);
+        if (i == bound) {
+            return prevBound;
+        }
+        if (i >= prevBound && i < bound) {
+            return luby(i - prevBound + 1);
+        }
+        k++;
     }
-    // Rekursiver Fall
-    return luby(i - (1 << (k -1)) + 1);
 }
 
 // Konstruktor: Größe setzen, Grundstrukturen vorbereiten

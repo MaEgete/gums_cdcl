@@ -1,15 +1,4 @@
-/*
-  Trail.h
-  -------
-  Repräsentiert den „Trail“ (Entscheidungspfad) des Solvers.
-  Hier werden alle Zuweisungen von Literalen mit ihrem Entscheidungslevel
-  und ggf. der verantwortlichen Klausel gespeichert.
 
-  Eine Zuweisung (TrailEntry) enthält:
-    - das Literal (Variable + Negation),
-    - den Entscheidunglevel (root = 0),
-    - den Index der Reason-Klausel im Solver (oder -1, falls es eine Entscheidung war).
-*/
 
 #ifndef TRAIL_H
 #define TRAIL_H
