@@ -1,8 +1,0 @@
-Solver                      Clause                   watchList
-  │ addClause(c)             │                        │
-  │─────────────────────────▶│ push_back               │
-  │                           │ initWatchesDefault()   │
-  │ if size==1:               │                        │ attach(idx, at(0))
-  │ else: attach(idx, at(w0)) │                        │
-  │       attach(idx, at(w1)) │                        │
-  │ if JW: heuristic.updateJeroslowWang(c)             │

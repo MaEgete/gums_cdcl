@@ -177,7 +177,7 @@ void Solver::detachClause(size_t clauseIdx, const Literal &w) {
     }
 }
 
-// Alte (langsame) Propagation: O(n*m), nur Vergleichszwecke
+// Alte (langsame) Propagation: nur Vergleichszwecke
 Clause* Solver::unitPropagation() {
     bool propagated;
     do {
