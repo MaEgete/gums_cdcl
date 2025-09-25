@@ -293,8 +293,6 @@ std::tuple<Clause,int,Literal> Solver::analyzeConflict(const Clause* conflict) {
             if (inLearned) { resolveLit = it->lit; break; }
         }
 
-        int before_cnt = countAtLevel(currentLevel);
-
         // Reason-Klausel besorgen
         int reason_idx = trail.getReasonIndexOfVar(resolveLit.getVar());
         const Clause* reason = (reason_idx >= 0 && reason_idx < static_cast<int>(clauses.size()))
@@ -318,27 +316,20 @@ std::tuple<Clause,int,Literal> Solver::analyzeConflict(const Clause* conflict) {
             return a.getVar() == b.getVar() && a.isNegated() == b.isNegated();
         };
 
-        // learnedClause: GLEICHES Vorzeichen wie resolveLit entfernen (resolveLit selbst)
+        // learnedClause: Komplement zu resolveLit entfernen
         for (const auto& l : learnedClause.getClause()) {
-            if (l.getVar() == resolveLit.getVar() && l.isNegated() == resolveLit.isNegated()) continue;
+            if (l.getVar() == resolveLit.getVar() && l.isNegated() != resolveLit.isNegated()) continue;
             if (std::ranges::none_of(newLits, [&](const Literal& x){ return litEquals(x,l); }))
                 newLits.push_back(l);
         }
-        // reason: KOMPLEMENT zu resolveLit entfernen
+        // reason: gleiches Vorzeichen wie resolveLit entfernen
         for (const auto& l : reason->getClause()) {
-            if (l.getVar() == resolveLit.getVar() && l.isNegated() != resolveLit.isNegated()) continue;
+            if (l.getVar() == resolveLit.getVar() && l.isNegated() == resolveLit.isNegated()) continue;
             if (std::ranges::none_of(newLits, [&](const Literal& x){ return litEquals(x,l); }))
                 newLits.push_back(l);
         }
 
         learnedClause = Clause(std::move(newLits));
-        int after_cnt = countAtLevel(currentLevel);
-        std::cout << "[analyze] before=" << before_cnt << " after=" << after_cnt
-                  << " | resolveLit=" << (resolveLit.isNegated()?"-":"+") << resolveLit.getVar() << std::endl;
-        if (after_cnt > before_cnt) {
-            std::cerr << "[analyze] ERROR: clause grew on current level — breaking to avoid infinite loop" << std::endl;
-            break;
-        }
     }
 
     // Gelernte Klausel selbst ebenfalls aktivieren (Clause-Activity)
