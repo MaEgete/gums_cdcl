@@ -66,22 +66,15 @@ bool Solver::solve() {
     }
 
     // CDCL-Schleife
-    int i = 0;
     while (true) {
-        std::cout << "Conflicts: " << stats.conflicts << std::endl;
-        std::cout << "i: " << i++ << std::endl;
         // BCP (Two-Watched-Literals)
         Clause* conflict = propagate();
         if (conflict != nullptr) {
-            std::cout << "KONFLIKT" << std::endl;
-            std::cout << "Level: " << decisionLevel << std::endl;
-
             // Konflikt auf Root-Level → UNSAT
             if (decisionLevel == 0) return false;
 
             // 1-UIP Analyse → (gelernte Klausel, Backjump-Level, assertierendes Literal)
             auto [learnedClause, backjumpLevel, assertLit] = analyzeConflict(conflict);
-            std::cout << "KONFLIKT2" << std::endl;
 
             // Backjump
             backtrackToLevel(backjumpLevel);
@@ -120,7 +113,7 @@ bool Solver::solve() {
             conflicts_since_restart++;
 
             // Seltene Statusausgabe (alle 1000 Konflikte)
-            if ((stats.conflicts % 10) == 0) {
+            if ((stats.conflicts % 1000) == 0) {
                 double lbd_avg = stats.learnt_lbd_count
                     ? (double)stats.learnt_lbd_sum / (double)stats.learnt_lbd_count
                     : 0.0;
@@ -247,7 +240,6 @@ void Solver::assign(const Literal& lit, int level, int reason_idx) {
 
 // Konfliktanalyse (1-UIP): gelernte Klausel, Backjump-Level, assertierendes Literal
 std::tuple<Clause,int,Literal> Solver::analyzeConflict(const Clause* conflict) {
-    std::cout << "KONFLIKT3" << std::endl;
     ScopedTimer _t(stats.t_analyze_ms);   // Analysezeit messen
     decayClauseInc(); // pro Konflikt genau einmal das Klausel-Inkrement zerfallen lassen
     Clause learnedClause = *conflict;     // Start mit Konfliktklausel
