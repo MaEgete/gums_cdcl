@@ -6,6 +6,7 @@
 #include <cassert>
 #include <unordered_set>
 #include <iomanip>
+#include <fstream>
 
 // Luby-Folge (i >= 1):
 // Liefert das i-te Element der Luby-Sequenz (für Restart-Budgets).
@@ -65,15 +66,22 @@ bool Solver::solve() {
     }
 
     // CDCL-Schleife
+    int i = 0;
     while (true) {
+        std::cout << "Conflicts: " << stats.conflicts << std::endl;
+        std::cout << "i: " << i++ << std::endl;
         // BCP (Two-Watched-Literals)
         Clause* conflict = propagate();
         if (conflict != nullptr) {
+            std::cout << "KONFLIKT" << std::endl;
+            std::cout << "Level: " << decisionLevel << std::endl;
+
             // Konflikt auf Root-Level → UNSAT
             if (decisionLevel == 0) return false;
 
             // 1-UIP Analyse → (gelernte Klausel, Backjump-Level, assertierendes Literal)
             auto [learnedClause, backjumpLevel, assertLit] = analyzeConflict(conflict);
+            std::cout << "KONFLIKT2" << std::endl;
 
             // Backjump
             backtrackToLevel(backjumpLevel);
@@ -112,7 +120,7 @@ bool Solver::solve() {
             conflicts_since_restart++;
 
             // Seltene Statusausgabe (alle 1000 Konflikte)
-            if ((stats.conflicts % 1000) == 0) {
+            if ((stats.conflicts % 10) == 0) {
                 double lbd_avg = stats.learnt_lbd_count
                     ? (double)stats.learnt_lbd_sum / (double)stats.learnt_lbd_count
                     : 0.0;
@@ -239,6 +247,7 @@ void Solver::assign(const Literal& lit, int level, int reason_idx) {
 
 // Konfliktanalyse (1-UIP): gelernte Klausel, Backjump-Level, assertierendes Literal
 std::tuple<Clause,int,Literal> Solver::analyzeConflict(const Clause* conflict) {
+    std::cout << "KONFLIKT3" << std::endl;
     ScopedTimer _t(stats.t_analyze_ms);   // Analysezeit messen
     decayClauseInc(); // pro Konflikt genau einmal das Klausel-Inkrement zerfallen lassen
     Clause learnedClause = *conflict;     // Start mit Konfliktklausel
@@ -284,6 +293,8 @@ std::tuple<Clause,int,Literal> Solver::analyzeConflict(const Clause* conflict) {
             if (inLearned) { resolveLit = it->lit; break; }
         }
 
+        int before_cnt = countAtLevel(currentLevel);
+
         // Reason-Klausel besorgen
         int reason_idx = trail.getReasonIndexOfVar(resolveLit.getVar());
         const Clause* reason = (reason_idx >= 0 && reason_idx < static_cast<int>(clauses.size()))
@@ -307,20 +318,27 @@ std::tuple<Clause,int,Literal> Solver::analyzeConflict(const Clause* conflict) {
             return a.getVar() == b.getVar() && a.isNegated() == b.isNegated();
         };
 
-        // learnedClause: Komplement zu resolveLit entfernen
+        // learnedClause: GLEICHES Vorzeichen wie resolveLit entfernen (resolveLit selbst)
         for (const auto& l : learnedClause.getClause()) {
-            if (l.getVar() == resolveLit.getVar() && l.isNegated() != resolveLit.isNegated()) continue;
+            if (l.getVar() == resolveLit.getVar() && l.isNegated() == resolveLit.isNegated()) continue;
             if (std::ranges::none_of(newLits, [&](const Literal& x){ return litEquals(x,l); }))
                 newLits.push_back(l);
         }
-        // reason: gleiches Vorzeichen wie resolveLit entfernen
+        // reason: KOMPLEMENT zu resolveLit entfernen
         for (const auto& l : reason->getClause()) {
-            if (l.getVar() == resolveLit.getVar() && l.isNegated() == resolveLit.isNegated()) continue;
+            if (l.getVar() == resolveLit.getVar() && l.isNegated() != resolveLit.isNegated()) continue;
             if (std::ranges::none_of(newLits, [&](const Literal& x){ return litEquals(x,l); }))
                 newLits.push_back(l);
         }
 
         learnedClause = Clause(std::move(newLits));
+        int after_cnt = countAtLevel(currentLevel);
+        std::cout << "[analyze] before=" << before_cnt << " after=" << after_cnt
+                  << " | resolveLit=" << (resolveLit.isNegated()?"-":"+") << resolveLit.getVar() << std::endl;
+        if (after_cnt > before_cnt) {
+            std::cerr << "[analyze] ERROR: clause grew on current level — breaking to avoid infinite loop" << std::endl;
+            break;
+        }
     }
 
     // Gelernte Klausel selbst ebenfalls aktivieren (Clause-Activity)
@@ -532,6 +550,28 @@ void Solver::printStats() const {
     std::cout << std::left << std::setw(20) << "Heuristic:"       << heuristicToString(currentHeuristic) << "\n";
     std::cout << "=======================================\n\n";
 }
+
+void Solver::exportStats(const std::string& filename) const {
+    std::ofstream csv_file{filename, std::ios::out | std::ios::app};
+
+    if (!csv_file.is_open()) {
+        std::cerr << "Datei \"" << filename << "\" konnte nicht geöffnet werden!";
+        return;
+    }
+
+    csv_file << "Decisions;Conflicts;Propagations;Learnts_added;Inspections;Watch_moves;BCP_time_(ms);Analzye_time_(ms);Restarts;LBD_avg;LBD_<=_2;LBD_3-4;LBD_>=_5;Deleted_clauses;Deleted_LBD_sum;Heuristic\n";
+
+    csv_file << stats.decisions << ";" << stats.conflicts << ";" << stats.propagations << ";"
+            << stats.learnts_added << ";" << stats.clause_inspections << ";" << stats.watch_moves << ";"
+            << stats.t_bcp_ms << ";" << stats.t_analyze_ms << ";" << stats.restarts << ";"
+            << (stats.learnt_lbd_count ? (double)stats.learnt_lbd_sum / (double)stats.learnt_lbd_count : 0.0) << ";"
+            << stats.learnt_lbd_le2 << ";" << stats.learnt_lbd_3_4 << ";" << stats.learnt_lbd_ge5 << ";"
+            << stats.deleted_count << ";" << stats.deleted_lbd_sum << ";" << heuristicToString(currentHeuristic) << "\n";
+
+
+    csv_file.close();
+}
+
 
 // Heuristik-Namen für die Statistik
 std::string Solver::heuristicToString(HeuristicType type) {

@@ -109,6 +109,8 @@ public:
     void printModel() const;              // Belegung ausgeben
     void printStats() const;              // Statistiken ausgeben
 
+    void exportStats(const std::string&) const;             // Statistiken in CSV-Datei schreiben
+
     // Neue, effiziente Propagation (Two-Watched-Literals)
     Clause* propagate();
 
