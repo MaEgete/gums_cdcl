@@ -67,6 +67,9 @@ mkdir -p build && cd build
 # Generate build files and compile
 cmake ..
 make
+
+# Run
+./cdcl_solver
 ```
 
 ---
