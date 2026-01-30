@@ -1,0 +1,2 @@
+Decisions;Conflicts;Propagations;Learnts_added;Inspections;Watch_moves;BCP_time_(ms);Analzye_time_(ms);Restarts;LBD_avg;LBD_<=_2;LBD_3-4;LBD_>=_5;Deleted_clauses;Deleted_LBD_sum;Heuristic
+758;5;1543;5;13243;1442;0;1;2;12.4;0;0;5;0;0;VSIDS

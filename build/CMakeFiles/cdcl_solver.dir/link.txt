@@ -1,0 +1,1 @@
+/usr/bin/c++ -Wl,--dependency-file=CMakeFiles/cdcl_solver.dir/link.d CMakeFiles/cdcl_solver.dir/main.cpp.o CMakeFiles/cdcl_solver.dir/Clause.cpp.o CMakeFiles/cdcl_solver.dir/Solver.cpp.o CMakeFiles/cdcl_solver.dir/Trail.cpp.o CMakeFiles/cdcl_solver.dir/CNFParser.cpp.o CMakeFiles/cdcl_solver.dir/Heuristic.cpp.o CMakeFiles/cdcl_solver.dir/Literal.cpp.o -o cdcl_solver
