@@ -1,3 +1,0 @@
-/var/home/megetemeyer/Schreibtisch/gums_cdcl/build/CMakeFiles/cdcl_solver.dir
-/var/home/megetemeyer/Schreibtisch/gums_cdcl/build/CMakeFiles/edit_cache.dir
-/var/home/megetemeyer/Schreibtisch/gums_cdcl/build/CMakeFiles/rebuild_cache.dir
