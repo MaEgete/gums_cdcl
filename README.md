@@ -5,7 +5,7 @@
 - Beinhaltet Techniken wie:
   - CDCL
   - 2WL
-  - Unit Propagation ( in Kommentierter Form)
+  - Unit Propagation (in Kommentierter Form)
   - Luby-Restarts
   - Clause Deletions
   - Phase Saving
